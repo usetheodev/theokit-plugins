@@ -1,0 +1,77 @@
+{
+  "name": "@usetheo/plugin-voice",
+  "version": "0.7.0",
+  "description": "Voice plugin for TheoKit — STT + TTS bridge with browser MediaRecorder helper + UI components.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@types/busboy": "^1.5.4",
+    "busboy": "^1.6.0",
+    "zod": "^3.24.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "theokit": ">=0.1.0-alpha.5"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.5.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jsdom": "^25.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "theokit": "link:../../../theokit/packages/theo",
+    "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "theokit",
+    "theokit-plugin",
+    "voice",
+    "speech-to-text",
+    "text-to-speech",
+    "whisper",
+    "openai",
+    "groq"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/usetheodev/theokit-plugins.git",
+    "directory": "packages/plugin-voice"
+  },
+  "homepage": "https://github.com/usetheodev/theokit-plugins/tree/main/packages/plugin-voice#readme",
+  "bugs": {
+    "url": "https://github.com/usetheodev/theokit-plugins/issues"
+  },
+  "license": "MIT"
+}

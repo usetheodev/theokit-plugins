@@ -1,0 +1,325 @@
+/**
+ * `useCanvas(options)` — React state machine for the artifact panel.
+ *
+ * Responsibilities:
+ *   - track the currently-displayed artifact (`current`)
+ *   - track every version of `current.id` so the rail can navigate
+ *   - track the entire session history (latest version of each id)
+ *   - own the controlled `open` state for `<CanvasPanel>`
+ *   - publish new artifacts to the backend store (POST) — optimistic
+ *     local insert + rollback on failure
+ *   - fork: publish a new artifact with `id` derived from the source
+ *     so it lives on a separate history line
+ *   - auto-open the panel on first artifact when `autoOpen` is true
+ *
+ * Not in scope (T4.5 / Wave 3):
+ *   - SSE subscription is wired in T4.8 (dogfood layer) — too coupled to
+ *     theokit's SSE shape to live in the framework-agnostic plugin
+ *
+ * State is a `useReducer` so each transition is observable + testable
+ * in isolation (vs scattered `useState` calls that hide ordering).
+ */
+import { useCallback, useMemo, useReducer, useRef } from 'react'
+
+import {
+  CanvasArtifactValidationError,
+  CanvasPluginError,
+} from '../errors.js'
+import { type Artifact, validateArtifact } from '../schema.js'
+
+// ───── State + actions ─────
+
+interface CanvasState {
+  // Map of artifactId → ordered ascending versions for that id.
+  history: Map<string, Artifact[]>
+  // Pointer into history: `{ id, version }` of the currently rendered
+  // artifact. `null` means the panel has no current selection.
+  pointer: { id: string; version: number } | null
+  open: boolean
+  // Last error from publish() / fork() — surfaced via the hook so the
+  // UI can render a toast.
+  error: CanvasPluginError | null
+}
+
+type CanvasAction =
+  | { type: 'show'; artifact: Artifact; autoOpen: boolean }
+  | { type: 'select-existing'; id: string; version: number }
+  | { type: 'hide' }
+  | { type: 'set-open'; open: boolean }
+  | { type: 'error'; error: CanvasPluginError }
+  | { type: 'clear-error' }
+  | { type: 'remove'; id: string; version?: number }
+
+function reducer(state: CanvasState, action: CanvasAction): CanvasState {
+  switch (action.type) {
+    case 'show': {
+      const next = new Map(state.history)
+      const existing = next.get(action.artifact.id) ?? []
+      // Replace the matching version OR append.
+      const filtered = existing.filter((a) => a.version !== action.artifact.version)
+      const merged = [...filtered, action.artifact].sort((a, b) => a.version - b.version)
+      next.set(action.artifact.id, merged)
+      return {
+        ...state,
+        history: next,
+        pointer: { id: action.artifact.id, version: action.artifact.version },
+        open: action.autoOpen ? true : state.open,
+        error: null,
+      }
+    }
+    case 'select-existing': {
+      return {
+        ...state,
+        pointer: { id: action.id, version: action.version },
+      }
+    }
+    case 'hide':
+      return { ...state, open: false }
+    case 'set-open':
+      return { ...state, open: action.open }
+    case 'error':
+      return { ...state, error: action.error }
+    case 'clear-error':
+      return { ...state, error: null }
+    case 'remove': {
+      const next = new Map(state.history)
+      const existing = next.get(action.id)
+      if (existing === undefined) return state
+      const remaining =
+        action.version === undefined
+          ? []
+          : existing.filter((a) => a.version !== action.version)
+      if (remaining.length === 0) next.delete(action.id)
+      else next.set(action.id, remaining)
+      const pointer =
+        state.pointer !== null && state.pointer.id === action.id
+          ? remaining.length > 0
+            ? { id: action.id, version: remaining[remaining.length - 1]?.version ?? 1 }
+            : null
+          : state.pointer
+      return { ...state, history: next, pointer }
+    }
+    default: {
+      const exhaustive: never = action
+      throw new Error(`Unhandled action: ${(exhaustive as { type: string }).type}`)
+    }
+  }
+}
+
+// ───── Public hook surface ─────
+
+export interface UseCanvasOptions {
+  /**
+   * Endpoint that accepts `POST` of `{ artifact }` and returns the
+   * persisted (server-versioned) artifact. Optional — when omitted,
+   * `publish()` skips the network round-trip and only updates local
+   * state (useful for ephemeral / preview-only flows).
+   */
+  endpoint?: string
+  /**
+   * CSRF header pair attached to every publish request. Default
+   * matches TheoKit strict mode (`X-Theo-Action: 1`). Pass `null` to
+   * disable.
+   */
+  csrfHeader?: { name: string; value: string } | null
+  /** Auto-open the panel when the first artifact arrives. Default true. */
+  autoOpen?: boolean
+  /** Test seam for fetch. */
+  fetchImpl?: typeof fetch
+  /** Seed the history with pre-loaded artifacts (e.g. server-side hydration). */
+  initialArtifacts?: ReadonlyArray<Artifact>
+}
+
+export interface UseCanvasState {
+  /** The currently displayed artifact (latest version selected). */
+  current: Artifact | null
+  /** All versions of the current artifact id, ascending. */
+  versions: ReadonlyArray<Artifact>
+  /** Latest version of EVERY artifact id in the session, sorted by createdAt desc. */
+  history: ReadonlyArray<Artifact>
+  /** Controlled `open` state for `<CanvasPanel>`. */
+  open: boolean
+  /** Last publish/fork error, null when none. */
+  error: CanvasPluginError | null
+
+  show: (artifact: Artifact) => void
+  selectVersion: (id: string, version: number) => void
+  hide: () => void
+  setOpen: (open: boolean) => void
+  clearError: () => void
+  publish: (artifact: Artifact) => Promise<Artifact>
+  fork: (source: Artifact, overrides: Partial<Artifact>) => Promise<Artifact>
+  remove: (id: string, version?: number) => void
+}
+
+const DEFAULT_CSRF_HEADER = { name: 'X-Theo-Action', value: '1' }
+
+export function useCanvas(options: UseCanvasOptions = {}): UseCanvasState {
+  const { endpoint, autoOpen = true, fetchImpl, initialArtifacts } = options
+  // Headers: `undefined` → use default; `null` → disabled; object → pass-through.
+  const csrfHeader: { name: string; value: string } | null =
+    options.csrfHeader === undefined ? DEFAULT_CSRF_HEADER : options.csrfHeader
+
+  const initialState = useMemo<CanvasState>(() => {
+    const history = new Map<string, Artifact[]>()
+    if (initialArtifacts !== undefined) {
+      for (const a of initialArtifacts) {
+        const existing = history.get(a.id) ?? []
+        existing.push(a)
+        history.set(a.id, existing.sort((x, y) => x.version - y.version))
+      }
+    }
+    return { history, pointer: null, open: false, error: null }
+    // initialArtifacts is captured once on mount by design — the hook
+    // is for live state, not for swapping seeds at runtime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [state, dispatch] = useReducer(reducer, initialState)
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  const show = useCallback(
+    (artifact: Artifact) => {
+      dispatch({ type: 'show', artifact, autoOpen })
+    },
+    [autoOpen],
+  )
+
+  const selectVersion = useCallback((id: string, version: number) => {
+    dispatch({ type: 'select-existing', id, version })
+  }, [])
+
+  const hide = useCallback(() => dispatch({ type: 'hide' }), [])
+  const setOpen = useCallback((nextOpen: boolean) => dispatch({ type: 'set-open', open: nextOpen }), [])
+  const clearError = useCallback(() => dispatch({ type: 'clear-error' }), [])
+  const remove = useCallback((id: string, version?: number) => {
+    dispatch({ type: 'remove', id, version })
+  }, [])
+
+  const publish = useCallback(
+    async (artifact: Artifact): Promise<Artifact> => {
+      const validation = validateArtifact(artifact)
+      if (!validation.ok) {
+        dispatch({ type: 'error', error: validation.error })
+        throw validation.error
+      }
+      // Optimistic local insert — the panel renders instantly even if
+      // the POST is still flying. On failure we roll back.
+      dispatch({ type: 'show', artifact: validation.artifact, autoOpen })
+
+      if (endpoint === undefined) return validation.artifact
+
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (csrfHeader !== null) headers[csrfHeader.name] = csrfHeader.value
+      try {
+        const res = await (fetchImpl ?? globalThis.fetch)(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(validation.artifact),
+        })
+        if (!res.ok) {
+          dispatch({
+            type: 'remove',
+            id: validation.artifact.id,
+            version: validation.artifact.version,
+          })
+          const text = await res.text().catch(() => '')
+          const err = new CanvasPluginError(
+            `Publish endpoint returned ${res.status}: ${text.slice(0, 200)}`,
+          )
+          dispatch({ type: 'error', error: err })
+          throw err
+        }
+        const persisted = (await res.json()) as { artifact?: Artifact } | Artifact
+        const out =
+          'artifact' in persisted && persisted.artifact !== undefined
+            ? persisted.artifact
+            : (persisted as Artifact)
+        const revalidate = validateArtifact(out)
+        if (!revalidate.ok) {
+          dispatch({ type: 'error', error: revalidate.error })
+          throw revalidate.error
+        }
+        // Replace the optimistic entry with the server's canonical shape
+        // (server may have re-numbered the version, mutated createdAt, …).
+        dispatch({ type: 'show', artifact: revalidate.artifact, autoOpen: false })
+        return revalidate.artifact
+      } catch (err) {
+        if (err instanceof CanvasPluginError || err instanceof CanvasArtifactValidationError) {
+          throw err
+        }
+        const wrapped = new CanvasPluginError(
+          `Publish network failure: ${err instanceof Error ? err.message : 'unknown'}`,
+          { cause: err },
+        )
+        dispatch({ type: 'error', error: wrapped })
+        throw wrapped
+      }
+    },
+    [autoOpen, csrfHeader, endpoint, fetchImpl],
+  )
+
+  const fork = useCallback(
+    async (source: Artifact, overrides: Partial<Artifact>): Promise<Artifact> => {
+      const next = {
+        ...source,
+        ...overrides,
+        // Fork lands on a new id by default so the version rail of the
+        // source stays untouched. Callers can pin `id` in overrides to
+        // create a new version of the SAME artifact instead.
+        id: overrides.id ?? `${source.id}-fork-${Date.now().toString(36)}`,
+        version: overrides.version ?? 1,
+        createdAt: overrides.createdAt ?? new Date().toISOString(),
+      } as Artifact
+      return publish(next)
+    },
+    [publish],
+  )
+
+  // Derived selectors.
+  const versions = useMemo<ReadonlyArray<Artifact>>(() => {
+    if (state.pointer === null) return []
+    return state.history.get(state.pointer.id) ?? []
+  }, [state.pointer, state.history])
+
+  const current = useMemo<Artifact | null>(() => {
+    if (state.pointer === null) return null
+    const versionsForId = state.history.get(state.pointer.id)
+    if (versionsForId === undefined) return null
+    return (
+      versionsForId.find((a) => a.version === state.pointer?.version) ??
+      versionsForId[versionsForId.length - 1] ??
+      null
+    )
+  }, [state.pointer, state.history])
+
+  const history = useMemo<ReadonlyArray<Artifact>>(() => {
+    const out: Artifact[] = []
+    for (const versions of state.history.values()) {
+      const latest = versions[versions.length - 1]
+      if (latest !== undefined) out.push(latest)
+    }
+    return out.sort((a, b) => {
+      const ay = typeof a.createdAt === 'string' ? Date.parse(a.createdAt) : a.createdAt
+      const by = typeof b.createdAt === 'string' ? Date.parse(b.createdAt) : b.createdAt
+      return by - ay
+    })
+  }, [state.history])
+
+  return {
+    current,
+    versions,
+    history,
+    open: state.open,
+    error: state.error,
+    show,
+    selectVersion,
+    hide,
+    setOpen,
+    clearError,
+    publish,
+    fork,
+    remove,
+  }
+}
