@@ -4,7 +4,9 @@ All notable changes to `@usetheo/plugin-canvas` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-05-31
+
+> First GA release of the canvas plugin. Promotes `0.3.0-next.0` to stable. The BREAKING change against `@usetheo/ui >= 0.13.0` listed below was already shipped in `0.3.0-next.0`; no further API changes.
 
 ### Added
 - `createArtifactBus()` exported from `@usetheo/plugin-canvas/server` subpath — process-local pub/sub for SSE-driven artifact emit. Replaces ad-hoc bus wiring in consumer apps (canvas-ecosystem-refactor-plan T3.1)
