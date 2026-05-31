@@ -37,3 +37,7 @@ tmp/
 
 # Local settings
 .claude/settings.local.json
+.claude/worktrees/
+.claude/ralph-loop.local.md
+.claude/knowledge-base/reviews/
+.claude/knowledge-base/plans/
