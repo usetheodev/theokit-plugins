@@ -25,7 +25,7 @@
     "zod": "^3.24.0"
   },
   "peerDependencies": {
-    "theokit": ">=0.2.2"
+    "theokit": ">=0.2.1"
   },
   "devDependencies": {
     "theokit": "link:../../../theokit/packages/theo"
