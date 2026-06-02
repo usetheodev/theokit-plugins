@@ -1,0 +1,11 @@
+src
+tests
+tsup.config.ts
+tsconfig.json
+vitest.config.ts
+.eslintrc*
+.prettier*
+*.test.ts
+*.test.tsx
+.vitest
+node_modules
