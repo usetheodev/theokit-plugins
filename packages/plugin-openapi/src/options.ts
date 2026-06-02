@@ -63,9 +63,11 @@ export type OpenApiOptions = z.input<typeof openApiOptionsSchema>
 export type ValidatedOpenApiOptions = z.output<typeof openApiOptionsSchema>
 
 export class OpenApiPluginConfigError extends Error {
-  constructor(message: string, public readonly cause?: unknown) {
+  public override readonly cause?: unknown
+  constructor(message: string, cause?: unknown) {
     super(message)
     this.name = 'OpenApiPluginConfigError'
+    this.cause = cause
   }
 }
 
