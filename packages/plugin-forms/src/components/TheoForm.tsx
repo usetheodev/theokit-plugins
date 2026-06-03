@@ -1,0 +1,187 @@
+/**
+ * Phase 4 / T4.1 — <TheoForm action={actions.X}> root component.
+ *
+ * Per plan p4-plugin-forms v1.1 ADR D1 (component, not render-prop) + D2
+ * (schema from actions.X.__zodSchema) + D4 (useAction.isPending primary) +
+ * D5 (JSON+devalue wire only).
+ *
+ * Composition:
+ *   <TheoForm action={actions.saveMemory}>
+ *     <TheoForm.Field name="conversationId">...</TheoForm.Field>
+ *     <TheoForm.Field name="content">...</TheoForm.Field>
+ *     <button type="submit">Save</button>
+ *   </TheoForm>
+ *
+ * Internal wiring:
+ *   - useAction(action) for mutate + pending + error
+ *   - useForm({resolver: zodResolver(action.__zodSchema)}) for RHF state
+ *   - FormProvider so descendants useFormContext()
+ *   - TheoFormContext.Provider so descendants useTheoFormState()
+ *   - handleValid passes RHF-validated input to useAction.mutateAsync;
+ *     on ActionInputError-shape error → applyActionErrorsToForm bridges to RHF
+ */
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAction } from "@theokit/react";
+import { forwardRef, type ReactNode, useCallback } from "react";
+import {
+  FormProvider,
+  type FieldValues,
+  type Resolver,
+  type UseFormReturn,
+  useForm,
+} from "react-hook-form";
+import { applyActionErrorsToForm } from "../adapter/applyActionErrorsToForm.js";
+import {
+  TheoFormContext,
+  type TheoFormContextValue,
+  type TheoFormErrorLike,
+} from "../context/TheoFormContext.js";
+import { TheoField } from "./TheoField.js";
+
+/**
+ * Shape of the action callable returned by `@theo/actions` virtual module proxy.
+ * Hard-typed callable + optional `__zodSchema` field per plan T1.1.
+ *
+ * Action is invoked with `mutateAsync(input)` — input MUST match `z.infer<__zodSchema>`.
+ */
+export interface TheoFormAction<TInput extends FieldValues = FieldValues, TData = unknown> {
+  (input: TInput): Promise<
+    { data: TData; error: undefined } | { data: undefined; error: TheoFormErrorLike }
+  >;
+  readonly __zodSchema?: {
+    parse?: (input: unknown) => TInput;
+    safeParse?: (input: unknown) => { success: boolean; data?: TInput; error?: unknown };
+  };
+}
+
+export interface TheoFormProps<TInput extends FieldValues = FieldValues, TData = unknown> {
+  action: TheoFormAction<TInput, TData>;
+  /**
+   * Initial values for the form. When omitted, RHF starts with empty/undefined.
+   * Type-checked against `z.infer<typeof action.__zodSchema>` when schema present.
+   */
+  defaultValues?: Partial<TInput>;
+  /**
+   * Schema escape hatch — when `action.__zodSchema` is undefined (consumer did
+   * NOT follow shared-schema convention), pass schema explicitly here. When
+   * both omitted, RHF runs without a resolver (client-side validation OFF;
+   * server-side ActionInputError still hydrates via the adapter).
+   */
+  schema?: TheoFormAction<TInput, TData>["__zodSchema"];
+  /**
+   * Optional callback fired AFTER successful submit (post-mutate). Useful for
+   * navigation, toast, etc. Receives the server response data.
+   */
+  onSuccess?: (data: TData) => void;
+  /**
+   * Children compose form fields, submit buttons, etc. Use `<TheoForm.Field>`
+   * (styled tier) or `useTheoField(name)` (headless) to wire inputs.
+   */
+  children: ReactNode;
+  /** Additional class names for the <form> element. */
+  className?: string;
+}
+
+/**
+ * Object.assign sub-parts pattern per ADR D1, mirroring theo-ui FormField at
+ * form-field.tsx:209-214. Consumers may write `<TheoForm.Field>` or the flat
+ * `<TheoField>` import — they are the same component.
+ */
+function TheoFormRootInner<TInput extends FieldValues, TData>(
+  props: TheoFormProps<TInput, TData>,
+  ref: React.ForwardedRef<HTMLFormElement>,
+): React.JSX.Element {
+  const { action, defaultValues, schema, onSuccess, children, className } = props;
+  const action_ = useAction<TInput, TData>(action);
+  // Schema priority: explicit prop > convention-attached __zodSchema > none
+  const resolvedSchema = schema ?? action.__zodSchema;
+  const resolver = resolvedSchema?.parse ? (zodResolver(resolvedSchema as never) as Resolver<TInput>) : undefined;
+  const form: UseFormReturn<TInput> = useForm<TInput>({
+    defaultValues: defaultValues as never,
+    ...(resolver ? { resolver } : {}),
+  });
+
+  const handleValid = useCallback(
+    async (values: TInput) => {
+      try {
+        const data = await action_.mutateAsync(values);
+        onSuccess?.(data);
+      } catch (err) {
+        // Map ActionInputError.fields into RHF setError calls so <TheoField>
+        // sub-parts surface field-level errors. Only fires when error has the
+        // duck-typed `fields` shape (G3 ActionInputError contract).
+        const fields = extractFieldsFromError(err);
+        if (fields !== undefined) {
+          // Cast: RHF's UseFormSetError has a narrower string-literal-union
+          // on the name param (Path<TInput>), but the adapter accepts plain
+          // string. The adapter is duck-typed by design (works with any RHF
+          // form, not just one with known schema keys).
+          applyActionErrorsToForm(
+            form.setError as unknown as (n: string, e: { type: string; message: string }) => void,
+            fields,
+          );
+        }
+        // Non-validation errors bubble via useAction.error (Context value).
+      }
+    },
+    [action_, form.setError, onSuccess],
+  );
+
+  const ctxValue: TheoFormContextValue = {
+    isPending: action_.isPending,
+    isSuccess: action_.isSuccess,
+    isError: action_.isError,
+    error: action_.error,
+    data: action_.data,
+    reset: () => {
+      action_.reset();
+      form.reset();
+    },
+  };
+
+  return (
+    <FormProvider {...form}>
+      <TheoFormContext.Provider value={ctxValue}>
+        <form
+          ref={ref}
+          onSubmit={form.handleSubmit(handleValid)}
+          method="post"
+          encType="application/x-www-form-urlencoded"
+          {...(className !== undefined ? { className } : {})}
+        >
+          {children}
+        </form>
+      </TheoFormContext.Provider>
+    </FormProvider>
+  );
+}
+
+const TheoFormRoot = forwardRef(TheoFormRootInner) as <
+  TInput extends FieldValues = FieldValues,
+  TData = unknown,
+>(
+  props: TheoFormProps<TInput, TData> & { ref?: React.ForwardedRef<HTMLFormElement> },
+) => React.JSX.Element;
+
+/**
+ * <TheoForm> with sub-parts attached per ADR D1.
+ * Consumers may use either:
+ *   <TheoForm.Field name="x">...</TheoForm.Field>
+ *   <TheoField name="x">...</TheoField>  (named import, same component)
+ */
+export const TheoForm = Object.assign(TheoFormRoot, {
+  Field: TheoField,
+});
+
+/**
+ * Duck-type detection of ActionInputError-shape error. We do NOT import the
+ * `ActionInputError` class from theokit/server to keep this peer-dep-free.
+ * Per `theokit/packages/theo/src/core/contracts/action-protocol.ts:149-175`:
+ *   ActionInputError { code, status, type:'TheoActionInputError', fields, issues }
+ */
+function extractFieldsFromError(err: unknown): Record<string, string[]> | undefined {
+  if (err === null || typeof err !== "object") return undefined;
+  const obj = err as Record<string, unknown>;
+  if (obj.fields === null || typeof obj.fields !== "object") return undefined;
+  return obj.fields as Record<string, string[]>;
+}
