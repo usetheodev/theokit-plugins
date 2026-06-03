@@ -1,17 +1,22 @@
 /**
  * T3.1 — Scalar HTML renderer (pure function).
  *
- * Per P#3 plan v1.3 T3.1 + EC-1 absorbed: openapiJsonPath embedded via
- * JSON.stringify (NOT escapeAttr) for JS-string context safety.
+ * Per P#3 plan v1.3 T3.1.
  *
- * 8 tests:
- *  - 6 structural (doctype + cdn script + scalar init + title + escape +
- *    custom cdn)
- *  - 2 EC-1 absorbed (JSON.stringify embed + parse safety)
+ * **2026-06-03 CSP-friendly fix (v0.1.1):** EC-1 originally embedded
+ * `openapiJsonPath` via `JSON.stringify` inside an inline
+ * `<script>Scalar.createApiReference(...)</script>` block. That inline
+ * script was blocked by theokit's default `script-src 'self'` CSP,
+ * causing the page to render blank in production-shaped apps. The fix
+ * removes the inline script entirely + uses Scalar's documented
+ * `<script src="..." data-url="..."></script>` data-attribute init
+ * pattern. The original 2 EC-1 tests are kept as regression tests with
+ * inverted assertions (the OLD broken inline form MUST NOT appear in
+ * output anymore).
  */
 import { describe, expect, it } from 'vitest'
 
-import { renderScalarHtml } from '../src/render-html.js'
+import { cdnHostForCsp, renderScalarHtml } from '../src/render-html.js'
 import { validateOpenApiOptions } from '../src/options.js'
 
 const baseOpts = () => validateOpenApiOptions({})
@@ -23,14 +28,8 @@ describe('renderScalarHtml — structural', () => {
 
   it('embeds the CDN script with default jsdelivr URL', () => {
     expect(renderScalarHtml(baseOpts())).toMatch(
-      /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@scalar\/api-reference">/,
+      /<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/@scalar\/api-reference"/,
     )
-  })
-
-  it('embeds Scalar.createApiReference init with default json path', () => {
-    const html = renderScalarHtml(baseOpts())
-    expect(html).toMatch(/Scalar\.createApiReference\('#app',/)
-    expect(html).toMatch(/url:\s*"\/api\/docs\/openapi\.json"/)
   })
 
   it('uses pageTitle in <title>', () => {
@@ -50,37 +49,66 @@ describe('renderScalarHtml — structural', () => {
     const html = renderScalarHtml(
       validateOpenApiOptions({ cdnUrl: 'https://my-cdn.com/s.js' }),
     )
-    expect(html).toMatch(/<script src="https:\/\/my-cdn\.com\/s\.js">/)
+    expect(html).toMatch(/<script\s+src="https:\/\/my-cdn\.com\/s\.js"/)
   })
 })
 
-describe('EC-1 absorbed — JSON.stringify embed for JS-string context', () => {
-  it('embeds openapiJsonPath via JSON.stringify (uses double quotes)', () => {
+describe('renderScalarHtml — CSP-friendly data-attribute init (v0.1.1 fix)', () => {
+  it('embeds openapiJsonPath via data-url attribute (Scalar data-attribute init pattern)', () => {
     const html = renderScalarHtml(
       validateOpenApiOptions({ openapiJsonPath: '/api/docs/openapi.json' }),
     )
-    // JSON.stringify produces "/api/docs/openapi.json" (double-quoted)
-    expect(html).toMatch(/url:\s*"\/api\/docs\/openapi\.json"/)
-    // Anti-pattern check: must NOT use single-quote wrapping (attribute-style)
-    expect(html).not.toMatch(/url:\s*'\/api\/docs\/openapi\.json'/)
+    // data-url attribute on the CDN script tag (Scalar reads it on load)
+    expect(html).toMatch(/<script[^>]*\sdata-url="\/api\/docs\/openapi\.json"/)
   })
 
-  it('inline script remains parseable when path contains pathological chars (apostrophe, quotes)', () => {
-    // openapiJsonPath defaults validate that path starts with / so we focus
-    // on the escape mechanism via direct schema check: a path with an embedded
-    // double quote (forbidden by validator but defense-in-depth tests render)
-    // JSON.stringify must produce well-formed JS string regardless of input.
+  it('REGRESSION: must NOT emit an inline init <script>Scalar.createApiReference</script>', () => {
+    // 2026-06-03 fix v0.1.1: the OLD form is blocked by `script-src 'self'`.
+    // If this test fails, /api/docs renders blank under default theokit CSP.
+    const html = renderScalarHtml(baseOpts())
+    expect(html).not.toMatch(/Scalar\.createApiReference/)
+    // Must not contain any inline script body (the only <script> tag is the
+    // CDN-src tag — body is empty)
+    const inlineScriptBody = html.match(/<script(?![^>]*\ssrc=)>([\s\S]*?)<\/script>/)
+    expect(inlineScriptBody).toBeNull()
+  })
+
+  it('REGRESSION: must not contain `url:` JSON literal that would only make sense in inline init', () => {
+    // Defense in depth — the inline init pattern used `url: "..."`. Absence
+    // proves the renderer fully moved to data-attribute pattern.
+    const html = renderScalarHtml(baseOpts())
+    expect(html).not.toMatch(/\burl:\s*"/)
+  })
+
+  it('html-escapes openapiJsonPath in data-url attribute (XSS defense in attribute context)', () => {
     const html = renderScalarHtml(
-      validateOpenApiOptions({ openapiJsonPath: '/api/x' }),
+      validateOpenApiOptions({ openapiJsonPath: '/api/x"><script>alert(1)</script>' }),
     )
-    // Extract the <script> body containing Scalar.createApiReference
-    const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/g)
-    expect(scriptMatch).toBeTruthy()
-    const initScript = scriptMatch?.find((s) => s.includes('Scalar.createApiReference'))
-    expect(initScript).toBeDefined()
-    // Prove the script body is well-formed JS: extract body + wrap in Function
-    // (no Scalar global; Function parse without execute proves syntactic validity)
-    const body = initScript?.replace(/^<script>|<\/script>$/g, '') ?? ''
-    expect(() => new Function('Scalar', body)).not.toThrow()
+    // The path got rejected by validator? No — validator only checks "starts
+    // with /". A pathological path containing quotes/script tags must be
+    // attribute-escaped so it cannot break out of the data-url attribute.
+    expect(html).not.toMatch(/data-url="[^"]*"><script>alert/)
+    expect(html).toMatch(/data-url="[^"]*&quot;&gt;&lt;script&gt;alert/)
+  })
+})
+
+describe('cdnHostForCsp — pure function', () => {
+  it('returns scheme+host for default jsdelivr CDN', () => {
+    expect(cdnHostForCsp('https://cdn.jsdelivr.net/npm/@scalar/api-reference')).toBe(
+      'https://cdn.jsdelivr.net',
+    )
+  })
+
+  it('preserves port when CDN URL has one', () => {
+    expect(cdnHostForCsp('https://my-cdn.example.com:8443/scalar.js')).toBe(
+      'https://my-cdn.example.com:8443',
+    )
+  })
+
+  it('does NOT include the path (so CSP grants the origin only, not a wildcard)', () => {
+    const host = cdnHostForCsp('https://cdn.jsdelivr.net/npm/@scalar/api-reference/foo/bar')
+    expect(host).not.toContain('/npm')
+    expect(host).not.toContain('/foo')
+    expect(host).toBe('https://cdn.jsdelivr.net')
   })
 })
