@@ -53,13 +53,22 @@ describe('renderScalarHtml — structural', () => {
   })
 })
 
-describe('renderScalarHtml — CSP-friendly data-attribute init (v0.1.1 fix)', () => {
-  it('embeds openapiJsonPath via data-url attribute (Scalar data-attribute init pattern)', () => {
+describe('renderScalarHtml — CSP-friendly two-script init (v0.1.1+v0.1.3 fix)', () => {
+  it('embeds openapiJsonPath via id=api-reference + data-url config tag (Scalar two-script init)', () => {
     const html = renderScalarHtml(
       validateOpenApiOptions({ openapiJsonPath: '/api/docs/openapi.json' }),
     )
-    // data-url attribute on the CDN script tag (Scalar reads it on load)
-    expect(html).toMatch(/<script[^>]*\sdata-url="\/api\/docs\/openapi\.json"/)
+    // v0.1.3 fix: Scalar 1.58 expects a separate <script id="api-reference">
+    // tag carrying the data-url; the bundle script tag stays clean (src only).
+    expect(html).toMatch(
+      /<script\s+id="api-reference"\s+data-url="\/api\/docs\/openapi\.json"\s*>/,
+    )
+    // The CDN bundle script tag MUST NOT also carry data-url (proves we
+    // moved away from the v0.1.1 single-script attribute attempt that
+    // Scalar 1.58 silently ignored).
+    expect(html).not.toMatch(
+      /<script\s+src="https:\/\/cdn\.jsdelivr\.net[^"]*"\s+data-url=/,
+    )
   })
 
   it('REGRESSION: must NOT emit an inline init <script>Scalar.createApiReference</script>', () => {
@@ -67,10 +76,19 @@ describe('renderScalarHtml — CSP-friendly data-attribute init (v0.1.1 fix)', (
     // If this test fails, /api/docs renders blank under default theokit CSP.
     const html = renderScalarHtml(baseOpts())
     expect(html).not.toMatch(/Scalar\.createApiReference/)
-    // Must not contain any inline script body (the only <script> tag is the
-    // CDN-src tag — body is empty)
-    const inlineScriptBody = html.match(/<script(?![^>]*\ssrc=)>([\s\S]*?)<\/script>/)
-    expect(inlineScriptBody).toBeNull()
+    // v0.1.3: two-script integration uses ONE inline tag (`<script
+    // id="api-reference" data-url="..."></script>`) as the config carrier —
+    // but it has NO BODY (only attributes). Other inline scripts (with body
+    // contents) MUST NOT appear; only the empty config tag + the CDN src tag.
+    const inlineScriptsWithBody = html.match(
+      /<script(?![^>]*\ssrc=)[^>]*>[\s\S]*?<\/script>/g,
+    ) || []
+    for (const tag of inlineScriptsWithBody) {
+      // Allow the empty `<script id="api-reference" data-url="..."></script>`
+      // config carrier; reject any tag with a JS body.
+      const body = tag.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '').trim()
+      expect(body, `inline script body must be empty, got: ${body.slice(0, 50)}`).toBe('')
+    }
   })
 
   it('REGRESSION: must not contain `url:` JSON literal that would only make sense in inline init', () => {

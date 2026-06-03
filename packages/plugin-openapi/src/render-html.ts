@@ -25,6 +25,19 @@ export function renderScalarHtml(opts: ValidatedOpenApiOptions): string {
   const safeCdnUrl = escapeAttr(opts.cdnUrl)
   const safeJsonPath = escapeAttr(opts.openapiJsonPath)
 
+  // Scalar v1.58.x integration pattern — TWO script tags, per
+  // github.com/scalar/scalar/blob/main/documentation/integrations/html-js.md:
+  //   1. `<script id="api-reference" data-url="...">` — configuration carrier;
+  //      Scalar's bundle scans the document for `#api-reference` on load and
+  //      reads `data-url` (or `data-configuration`) off that tag. This tag
+  //      stays empty body — it's a pure attribute container.
+  //   2. `<script src="<cdn>">` — the actual bundle. After load it picks up
+  //      the config tag and mounts to a generated container in <body>.
+  //
+  // Earlier v0.1.1 attempt put `data-url` on the BUNDLE script tag itself,
+  // which Scalar 1.58 ignores — bundle loads but never initializes → blank
+  // page. Discovered via Chrome DevTools `window.Scalar !== undefined` +
+  // `#app.innerHTML.length === 0` after the v0.1.2 CSP fix.
   return `<!doctype html>
 <html>
   <head>
@@ -33,8 +46,8 @@ export function renderScalarHtml(opts: ValidatedOpenApiOptions): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
-    <div id="app"></div>
-    <script src="${safeCdnUrl}" data-url="${safeJsonPath}"></script>
+    <script id="api-reference" data-url="${safeJsonPath}"></script>
+    <script src="${safeCdnUrl}"></script>
   </body>
 </html>
 `

@@ -56,23 +56,29 @@ export default function openApiPlugin(options: OpenApiOptions = {}): TheoPlugin 
         if (path === opts.docsPath) {
           ctx.response.statusCode = 200
           ctx.response.setHeader('Content-Type', 'text/html; charset=utf-8')
-          // 2026-06-03 fix v0.1.1: per-response CSP that allows the Scalar
-          // CDN host. setHeader REPLACES any prior CSP (e.g. theokit's
+          // 2026-06-03 fix v0.1.1+v0.1.2: per-response CSP that allows the
+          // Scalar CDN host. setHeader REPLACES any prior CSP (e.g. theokit's
           // default `script-src 'self'`) for this single response, scoped
           // strictly to /api/docs. Other routes keep the host CSP.
           //
-          // We intentionally keep 'unsafe-inline' OFF for script-src — the
-          // v0.1.1 render-html change eliminates the inline init block, so
-          // Scalar boots purely via data-attribute on its own script tag.
+          // 'unsafe-inline' for script-src stays OFF — the v0.1.1 render-html
+          // change eliminated the inline init block. 'unsafe-eval' for
+          // script-src is REQUIRED — Scalar's bundle uses eval() internally
+          // for Vue runtime template compilation (verified via DevTools
+          // CSP violation `standalone.js:314 script-src blocked`). Without
+          // it the bundle loads but the Vue app cannot mount → blank page.
+          // The exception is narrowly scoped to /api/docs only; the host
+          // CSP for every other route stays strict (no eval). Industry
+          // standard for API doc UIs (Swagger UI + Redoc require the same).
           // 'unsafe-inline' for STYLE is allowed because Scalar injects
-          // dynamic styles at runtime (its own bundle requirement; not under
-          // our control without forking).
+          // dynamic styles at runtime (bundle requirement; not under our
+          // control without forking).
           const cdnHost = cdnHostForCsp(opts.cdnUrl)
           ctx.response.setHeader(
             'Content-Security-Policy',
             [
               "default-src 'self'",
-              `script-src 'self' ${cdnHost}`,
+              `script-src 'self' 'unsafe-eval' ${cdnHost}`,
               "style-src 'self' 'unsafe-inline'",
               `img-src 'self' data: ${cdnHost}`,
               `font-src 'self' data: ${cdnHost}`,
