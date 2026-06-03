@@ -1,13 +1,13 @@
-# @usetheo/plugin-cors
+# @theokit/plugin-cors
 
 > CORS (Cross-Origin Resource Sharing) plugin for [TheoKit](https://github.com/usetheodev/theokit). Implements the W3C CORS spec — preflight short-circuit, dynamic origin matching, `Vary: Origin` for caching correctness.
 
 ## Installation
 
 ```bash
-pnpm add @usetheo/plugin-cors
-# or: npm install @usetheo/plugin-cors
-# or: yarn add @usetheo/plugin-cors
+pnpm add @theokit/plugin-cors
+# or: npm install @theokit/plugin-cors
+# or: yarn add @theokit/plugin-cors
 ```
 
 Requires `theokit >= 0.1.0-alpha.5` as a peer dependency.
@@ -17,7 +17,7 @@ Requires `theokit >= 0.1.0-alpha.5` as a peer dependency.
 ```ts
 // theo.config.ts
 import { defineConfig } from 'theokit'
-import cors from '@usetheo/plugin-cors'
+import cors from '@theokit/plugin-cors'
 
 export default defineConfig({
   plugins: [
@@ -76,7 +76,7 @@ The plugin **throws at construction time** if you pass both:
 
 ```ts
 cors({ origin: '*', credentials: true })
-// throws: [@usetheo/plugin-cors] Invalid options: `origin: '*'` with `credentials: true`
+// throws: [@theokit/plugin-cors] Invalid options: `origin: '*'` with `credentials: true`
 // is forbidden by the CORS spec (browsers will reject the response). Use a
 // specific origin string, an allowlist array, or `(origin) => true` predicate
 // to echo the request origin.
@@ -102,7 +102,7 @@ If your predicate throws (e.g., due to a typo or runtime error), the plugin trea
 
 ## Migrating from Express `cors`
 
-| Express `cors` option                | `@usetheo/plugin-cors` equivalent     | Notes                                         |
+| Express `cors` option                | `@theokit/plugin-cors` equivalent     | Notes                                         |
 | ------------------------------------ | ------------------------------------- | --------------------------------------------- |
 | `origin: '*'`                        | `origin: '*'`                         | Same. Forbidden with credentials.             |
 | `origin: 'https://a.com'`            | `origin: 'https://a.com'`             | Same.                                         |
@@ -120,7 +120,7 @@ If your predicate throws (e.g., due to a typo or runtime error), the plugin trea
 ## Architecture & decisions
 
 - [ADR-0008 (TheoKit core)](https://github.com/usetheodev/theokit/blob/main/docs/adr/0008-theoplugin-is-the-canonical-sdk.md) — `TheoPlugin` is the canonical SDK
-- [ADR-0011 (TheoKit core)](https://github.com/usetheodev/theokit/blob/main/docs/adr/0011-moderate-plugin-roadmap-strategy.md) — moderate plugin roadmap; `@usetheo/plugin-cors` is the first shipping plugin
+- [ADR-0011 (TheoKit core)](https://github.com/usetheodev/theokit/blob/main/docs/adr/0011-moderate-plugin-roadmap-strategy.md) — moderate plugin roadmap; `@theokit/plugin-cors` is the first shipping plugin
 
 ## License
 

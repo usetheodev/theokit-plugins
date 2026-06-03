@@ -20,9 +20,9 @@ describe('T2.3 — README hygiene', () => {
     expect(README).toMatch(/##\s+Offline mode/i)
   })
 
-  it('has openApiPlugin import snippet referencing the @usetheo scope', () => {
+  it('has openApiPlugin import snippet referencing the @theokit scope', () => {
     expect(README).toMatch(
-      /import openApiPlugin from ['"]@usetheo\/plugin-openapi['"]/,
+      /import openApiPlugin from ['"]@theokit\/plugin-openapi['"]/,
     )
   })
 })

@@ -72,12 +72,12 @@ describe('T3.3 — registration', () => {
   it('default export is a function returning a TheoPlugin', () => {
     const plugin = openApiPlugin()
     expect(typeof plugin.register).toBe('function')
-    expect(plugin.name).toBe('@usetheo/plugin-openapi')
+    expect(plugin.name).toBe('@theokit/plugin-openapi')
   })
 
   it('registers with PluginRunner without throwing', async () => {
     const runner = await makeRunnerWith()
-    expect(runner.has('@usetheo/plugin-openapi')).toBe(true)
+    expect(runner.has('@theokit/plugin-openapi')).toBe(true)
   })
 
   it('duplicate registration throws DuplicatePluginError', async () => {

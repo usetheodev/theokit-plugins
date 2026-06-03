@@ -1,5 +1,5 @@
 {
-  "name": "@usetheo/plugin-cors",
+  "name": "@theokit/plugin-cors",
   "version": "0.1.0",
   "description": "CORS plugin for TheoKit — handles preflight, origin matching, Vary header per W3C spec",
   "type": "module",

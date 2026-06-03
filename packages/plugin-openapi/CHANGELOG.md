@@ -1,4 +1,4 @@
-# @usetheo/plugin-openapi changelog
+# @theokit/plugin-openapi changelog
 
 All notable changes to this package will be documented in this file.
 

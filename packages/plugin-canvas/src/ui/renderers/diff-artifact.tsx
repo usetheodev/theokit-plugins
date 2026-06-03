@@ -1,9 +1,9 @@
-import { DiffViewer, type DiffHunk } from '@usetheo/ui'
+import { DiffViewer, type DiffHunk } from '@theokit/ui'
 
 import type { ArtifactRendererProps } from './types.js'
 
 /**
- * DiffArtifact — delegates to `@usetheo/ui/DiffViewer` primitive.
+ * DiffArtifact — delegates to `@theokit/ui/DiffViewer` primitive.
  * Artifact's `hunks` shape is identical to `DiffHunk[]` (same id/header/lines
  * with kind+oldNumber+newNumber+content), so no adapter needed. T2.2 of
  * canvas-ecosystem-refactor.

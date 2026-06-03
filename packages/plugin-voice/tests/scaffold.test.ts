@@ -1,5 +1,5 @@
 /**
- * Smoke tests for the public surface of @usetheo/plugin-voice.
+ * Smoke tests for the public surface of @theokit/plugin-voice.
  *
  * Covers:
  *   - error hierarchy exports the right classes with stable names
@@ -84,7 +84,7 @@ describe('plugin-voice public surface', () => {
       delete process.env.OPENAI_API_KEY
       try {
         const plugin = voicePlugin(apiKeyOpts)
-        expect(plugin.name).toBe('@usetheo/plugin-voice')
+        expect(plugin.name).toBe('@theokit/plugin-voice')
       } finally {
         if (prev !== undefined) process.env.OPENAI_API_KEY = prev
       }
@@ -98,7 +98,7 @@ describe('plugin-voice public surface', () => {
           stt: { envVar: 'MY_KEY' },
           tts: { envVar: 'MY_KEY' },
         })
-        expect(plugin.name).toBe('@usetheo/plugin-voice')
+        expect(plugin.name).toBe('@theokit/plugin-voice')
       } finally {
         if (prev === undefined) delete process.env.MY_KEY
         else process.env.MY_KEY = prev

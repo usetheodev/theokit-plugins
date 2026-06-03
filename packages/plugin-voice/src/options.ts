@@ -96,7 +96,7 @@ function resolveStt(stt: ResolvedVoiceOptions['stt']): VoiceConfig['stt'] {
   const apiKey = stt.apiKey ?? process.env[envVar]
   if (apiKey === undefined || apiKey.length === 0) {
     throw new VoicePluginConfigError(
-      `Missing ${envVar} for @usetheo/plugin-voice STT (provider=${stt.provider}). Set the env var or pass stt.apiKey explicitly. See @usetheo/plugin-voice README → Configuration.`,
+      `Missing ${envVar} for @theokit/plugin-voice STT (provider=${stt.provider}). Set the env var or pass stt.apiKey explicitly. See @theokit/plugin-voice README → Configuration.`,
     )
   }
   return {
@@ -112,7 +112,7 @@ function resolveTts(tts: ResolvedVoiceOptions['tts']): VoiceConfig['tts'] {
   const apiKey = tts.apiKey ?? process.env[envVar]
   if (apiKey === undefined || apiKey.length === 0) {
     throw new VoicePluginConfigError(
-      `Missing ${envVar} for @usetheo/plugin-voice TTS (provider=${tts.provider}). Set the env var or pass tts.apiKey explicitly. See @usetheo/plugin-voice README → Configuration.`,
+      `Missing ${envVar} for @theokit/plugin-voice TTS (provider=${tts.provider}). Set the env var or pass tts.apiKey explicitly. See @theokit/plugin-voice README → Configuration.`,
     )
   }
   return {

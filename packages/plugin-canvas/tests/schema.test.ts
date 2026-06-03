@@ -193,7 +193,7 @@ describe('validateArtifact — boundary regressions', () => {
 
   /**
    * Regression: the size cap MUST NOT depend on Node's `Buffer`. The
-   * plugin ships in the browser bundle via `@usetheo/plugin-canvas/ui`
+   * plugin ships in the browser bundle via `@theokit/plugin-canvas/ui`
    * and shares the schema; a previous build referenced
    * `Buffer.byteLength` and crashed the browser with
    * `ReferenceError: Buffer is not defined`. The fix uses TextEncoder

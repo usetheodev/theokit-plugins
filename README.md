@@ -92,4 +92,4 @@ MIT — same as the TheoKit core. See [LICENSE](./LICENSE).
 
 - [TheoKit framework](https://github.com/usetheodev/theokit) — the core
 - [TheoKit SDK](https://github.com/usetheodev/theokit-sdk) — agent runtime
-- [@usetheo/ui](https://github.com/usetheodev/theo-ui) — React component library
+- [@theokit/ui](https://github.com/usetheodev/theo-ui) — React component library

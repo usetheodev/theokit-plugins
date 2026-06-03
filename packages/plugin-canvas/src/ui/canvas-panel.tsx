@@ -1,4 +1,4 @@
-import { Button, CopyButton, Tooltip } from '@usetheo/ui'
+import { Button, CopyButton, Tooltip } from '@theokit/ui'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import type { Artifact } from '../schema.js'

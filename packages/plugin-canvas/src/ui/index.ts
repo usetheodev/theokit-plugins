@@ -1,5 +1,5 @@
 /**
- * Browser-only UI surface for @usetheo/plugin-canvas.
+ * Browser-only UI surface for @theokit/plugin-canvas.
  *
  * Public API:
  *   - `<ArtifactRenderer>` — dispatcher with renderer registry override

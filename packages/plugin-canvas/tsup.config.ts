@@ -11,5 +11,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   target: 'es2022',
-  external: ['react', 'react-dom', '@usetheo/ui', '@usetheo/sdk', 'mermaid', 'theokit'],
+  external: ['react', 'react-dom', '@theokit/ui', '@theokit/sdk', 'mermaid', 'theokit'],
 })

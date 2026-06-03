@@ -1,5 +1,5 @@
 /**
- * Integration test — exercises @usetheo/plugin-cors against the REAL
+ * Integration test — exercises @theokit/plugin-cors against the REAL
  * PluginRunner from `theokit/server` (cross-repo via D7).
  *
  * Uses minimal IncomingMessage/ServerResponse mocks to drive hooks without

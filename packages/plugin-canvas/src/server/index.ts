@@ -1,9 +1,9 @@
 /**
- * Server-side entrypoint of `@usetheo/plugin-canvas`.
+ * Server-side entrypoint of `@theokit/plugin-canvas`.
  *
  * Import via:
  *
- *     import { createArtifactBus } from '@usetheo/plugin-canvas/server'
+ *     import { createArtifactBus } from '@theokit/plugin-canvas/server'
  *
  * Re-exports only server-safe modules — never pulls React UI.
  */

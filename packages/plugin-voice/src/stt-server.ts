@@ -1,5 +1,5 @@
 /**
- * Server-side STT handler for @usetheo/plugin-voice.
+ * Server-side STT handler for @theokit/plugin-voice.
  *
  * Accepts an already-parsed `SttInput` (audio blob/buffer + optional
  * language/prompt) and returns a `Response`. The caller is responsible

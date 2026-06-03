@@ -1,5 +1,5 @@
 /**
- * Canonical `Artifact` protocol for @usetheo/plugin-canvas.
+ * Canonical `Artifact` protocol for @theokit/plugin-canvas.
  *
  * Discriminated union on `kind`. Each variant carries the same envelope
  * (id, sessionId?, title, version, createdAt) plus a kind-specific
@@ -27,7 +27,7 @@
  *     with a 5 MB cap on the base64 length (≈3.75 MB decoded).
  *
  *   - `whiteboard-scene` accepts a free-form JSON object — the
- *     `<Whiteboard>` primitive from `@usetheo/ui/whiteboard` runs its
+ *     `<Whiteboard>` primitive from `@theokit/ui/whiteboard` runs its
  *     own Zod gate on top (clamps + finite checks).
  *
  *   - `slide-deck` accepts markdown (string) or a pre-parsed array of

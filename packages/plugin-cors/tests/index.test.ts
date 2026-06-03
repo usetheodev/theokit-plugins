@@ -234,7 +234,7 @@ describe('T2.3 — corsPlugin wired as TheoPlugin', () => {
   describe('plugin shape', () => {
     it('returns a TheoPlugin with correct name', () => {
       const plugin = corsPlugin({})
-      expect(plugin.name).toBe('@usetheo/plugin-cors')
+      expect(plugin.name).toBe('@theokit/plugin-cors')
       expect(typeof plugin.register).toBe('function')
     })
 

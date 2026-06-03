@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest'
 
 const CHANGESET_PATH = resolve(__dirname, '../../../.changeset/initial-cors-release.md')
 
-describe('T1.2 — initial changeset for @usetheo/plugin-cors@0.1.0', () => {
+describe('T1.2 — initial changeset for @theokit/plugin-cors@0.1.0', () => {
   it('changeset file exists (happy path)', () => {
     expect(existsSync(CHANGESET_PATH)).toBe(true)
   })
 
-  it('frontmatter bumps @usetheo/plugin-cors at minor (validation error if wrong bump)', () => {
+  it('frontmatter bumps @theokit/plugin-cors at minor (validation error if wrong bump)', () => {
     const content = readFileSync(CHANGESET_PATH, 'utf8')
     expect(content).toMatch(/^---\n['"]?@theokit\/plugin-cors['"]?:\s*minor\n---/)
   })

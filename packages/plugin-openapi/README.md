@@ -1,4 +1,4 @@
-# @usetheo/plugin-openapi
+# @theokit/plugin-openapi
 
 > OpenAPI docs UI for TheoKit. Mounts [Scalar](https://github.com/scalar/scalar) at `/api/docs` reading the `.theo/openapi.json` emitted by `theokit build` (or `theokit dev` after P#3 ships).
 
@@ -7,7 +7,7 @@ Zero npm runtime deps on `@scalar/*` — the UI loads from `https://cdn.jsdelivr
 ## Install
 
 ```bash
-pnpm add @usetheo/plugin-openapi
+pnpm add @theokit/plugin-openapi
 ```
 
 Requires `theokit >= 0.2.2` (peerDep). Earlier theokit versions don't emit `.theo/openapi.json` automatically in dev mode.
@@ -18,7 +18,7 @@ In your `theo.config.ts`:
 
 ```ts
 import { defineConfig } from 'theokit'
-import openApiPlugin from '@usetheo/plugin-openapi'
+import openApiPlugin from '@theokit/plugin-openapi'
 
 export default defineConfig({
   // Opt into G2's OpenAPI emit

@@ -1,5 +1,5 @@
 /**
- * Fixture (T3.1) — minimal TheoKit app demonstrating @usetheo/plugin-cors
+ * Fixture (T3.1) — minimal TheoKit app demonstrating @theokit/plugin-cors
  * wired into theo.config.ts > plugins[].
  *
  * Cross-repo workspace per ADR D7 (theokit available via `link:` in plugin

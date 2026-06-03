@@ -1,4 +1,4 @@
-import { Alert } from '@usetheo/ui'
+import { Alert } from '@theokit/ui'
 
 import type { Artifact } from '../schema.js'
 import { DEFAULT_RENDERERS } from './renderers/index.js'
@@ -40,7 +40,7 @@ export interface ArtifactRendererProps {
  * Tree-shaking: imports are static so all 9 default renderers ship in
  * any consumer bundle that uses the dispatcher. Apps that need a tiny
  * surface can import the individual renderers directly:
- * `import { CodeArtifact } from '@usetheo/plugin-canvas/ui'` and skip
+ * `import { CodeArtifact } from '@theokit/plugin-canvas/ui'` and skip
  * the dispatcher entirely.
  */
 export function ArtifactRenderer({ artifact, renderers }: ArtifactRendererProps) {

@@ -1,5 +1,5 @@
 /**
- * Server-side TTS handler for @usetheo/plugin-voice.
+ * Server-side TTS handler for @theokit/plugin-voice.
  *
  * Accepts an already-parsed `TtsInput` (`{ text, voice? }`) and returns
  * a `Response` whose body streams `audio/mpeg` directly from OpenAI
