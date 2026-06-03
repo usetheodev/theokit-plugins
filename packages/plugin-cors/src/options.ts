@@ -61,7 +61,7 @@ export function validateCorsOptions(opts: CorsOptions): CorsOptionsResolved {
   const parsed = corsOptionsSchema.parse(opts)
   if (parsed.origin === '*' && parsed.credentials === true) {
     throw new Error(
-      "[@usetheo/plugin-cors] Invalid options: `origin: '*'` with `credentials: true` is forbidden by the CORS spec (browsers will reject the response). " +
+      "[@theokit/plugin-cors] Invalid options: `origin: '*'` with `credentials: true` is forbidden by the CORS spec (browsers will reject the response). " +
         'Use a specific origin string, an allowlist array, or `(origin) => true` predicate to echo the request origin.',
     )
   }

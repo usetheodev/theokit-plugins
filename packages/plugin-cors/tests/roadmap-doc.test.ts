@@ -25,20 +25,20 @@ describe('T6.1 — theokit-plugins/ROADMAP.md', () => {
 
   it('lists 3 committed plugins (cors + sentry + i18n)', () => {
     const content = readFileSync(ROADMAP_PATH, 'utf8')
-    expect(content).toContain('@usetheo/plugin-cors')
-    expect(content).toContain('@usetheo/plugin-sentry')
-    expect(content).toContain('@usetheo/plugin-i18n')
+    expect(content).toContain('@theokit/plugin-cors')
+    expect(content).toContain('@theokit/plugin-sentry')
+    expect(content).toContain('@theokit/plugin-i18n')
   })
 
   it('lists 6 demand-gated plugins with 0 evidence', () => {
     const content = readFileSync(ROADMAP_PATH, 'utf8')
     for (const name of [
-      '@usetheo/plugin-otel',
-      '@usetheo/plugin-resend',
-      '@usetheo/plugin-stripe-webhooks',
-      '@usetheo/plugin-clerk',
-      '@usetheo/plugin-feature-flags',
-      '@usetheo/plugin-inngest',
+      '@theokit/plugin-otel',
+      '@theokit/plugin-resend',
+      '@theokit/plugin-stripe-webhooks',
+      '@theokit/plugin-clerk',
+      '@theokit/plugin-feature-flags',
+      '@theokit/plugin-inngest',
     ]) {
       expect(content, `${name} must appear in demand-gated table`).toContain(name)
     }

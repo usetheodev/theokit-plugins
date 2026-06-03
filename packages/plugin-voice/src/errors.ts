@@ -1,5 +1,5 @@
 /**
- * Typed error hierarchy for @usetheo/plugin-voice (EC-4 / EC-6).
+ * Typed error hierarchy for @theokit/plugin-voice (EC-4 / EC-6).
  *
  * Why a custom hierarchy and not bare Error: the recorder runs in the
  * browser where MediaDevices throws `DOMException` with different `.name`

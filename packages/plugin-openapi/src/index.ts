@@ -1,5 +1,5 @@
 /**
- * @usetheo/plugin-openapi — Scalar UI for TheoKit OpenAPI docs.
+ * @theokit/plugin-openapi — Scalar UI for TheoKit OpenAPI docs.
  *
  * Per P#3 plan v1.3 T3.3 + ADRs D1 D2 D5 + 3 absorbed edge cases (EC-3
  * writableEnded guard, EC-6 trailing-slash strict match, EC-7 GET-only).
@@ -33,7 +33,7 @@ export default function openApiPlugin(options: OpenApiOptions = {}): TheoPlugin 
   const cwd = process.cwd()
 
   return defineTheoPlugin({
-    name: '@usetheo/plugin-openapi',
+    name: '@theokit/plugin-openapi',
     register(app) {
       app.addHook('onRequest', (ctx: PluginContext) => {
         // EC-3 absorbed: defensive short-circuit when a prior plugin

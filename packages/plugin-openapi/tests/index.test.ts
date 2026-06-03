@@ -8,14 +8,14 @@ import openApiPlugin, {
   OpenApiPluginConfigError,
 } from '../src/index.js'
 
-describe('@usetheo/plugin-openapi index smoke', () => {
+describe('@theokit/plugin-openapi index smoke', () => {
   it('default export is a function', () => {
     expect(typeof openApiPlugin).toBe('function')
   })
 
   it('default export returns a TheoPlugin with name + register', () => {
     const p = openApiPlugin()
-    expect(p.name).toBe('@usetheo/plugin-openapi')
+    expect(p.name).toBe('@theokit/plugin-openapi')
     expect(typeof p.register).toBe('function')
   })
 

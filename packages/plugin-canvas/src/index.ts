@@ -1,5 +1,5 @@
 /**
- * @usetheo/plugin-canvas — artifact protocol + side-panel UI + agent
+ * @theokit/plugin-canvas — artifact protocol + side-panel UI + agent
  * custom tool for emitting rich, renderable outputs from a TheoKit
  * agent surface.
  *
@@ -9,8 +9,8 @@
  *   - `./ui` subpath        — browser-only React components + hook
  *
  * Apps mount the renderers via `import { CanvasPanel, useCanvas } from
- * '@usetheo/plugin-canvas/ui'` and wire the tool via `import { defineArtifactTool }
- * from '@usetheo/plugin-canvas'`. Either side can be tree-shaken when
+ * '@theokit/plugin-canvas/ui'` and wire the tool via `import { defineArtifactTool }
+ * from '@theokit/plugin-canvas'`. Either side can be tree-shaken when
  * unused.
  */
 

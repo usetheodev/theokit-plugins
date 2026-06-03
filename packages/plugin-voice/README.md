@@ -1,4 +1,4 @@
-# @usetheo/plugin-voice
+# @theokit/plugin-voice
 
 Voice (Speech-to-Text + Text-to-Speech) plugin for [TheoKit](https://github.com/usetheodev/theokit).
 
@@ -14,7 +14,7 @@ Voice (Speech-to-Text + Text-to-Speech) plugin for [TheoKit](https://github.com/
 ## Install
 
 ```sh
-pnpm add @usetheo/plugin-voice
+pnpm add @theokit/plugin-voice
 ```
 
 Peer dependencies:
@@ -29,7 +29,7 @@ Peer dependencies:
 ```ts
 // theo.config.ts
 import { defineTheoConfig } from 'theokit/server'
-import voicePlugin from '@usetheo/plugin-voice'
+import voicePlugin from '@theokit/plugin-voice'
 
 export default defineTheoConfig({
   plugins: [
@@ -64,8 +64,8 @@ Both paths are configurable via `stt.endpoint` / `tts.endpoint`. They must start
 ```tsx
 // React 18/19 client component
 'use client'
-import { VoiceRecorderBar } from '@usetheo/plugin-voice/ui'
-import { ChatComposer } from '@usetheo/ui'
+import { VoiceRecorderBar } from '@theokit/plugin-voice/ui'
+import { ChatComposer } from '@theokit/ui'
 
 export function ChatPage() {
   const [value, setValue] = useState('')
@@ -92,7 +92,7 @@ import {
   VoiceNoDeviceError,
   VoicePluginConfigError,
   VoiceProviderError,
-} from '@usetheo/plugin-voice'
+} from '@theokit/plugin-voice'
 
 try {
   await recorder.start()

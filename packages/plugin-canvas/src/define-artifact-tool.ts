@@ -2,14 +2,14 @@
  * `defineArtifactTool` — produces an SDK-shaped custom tool the agent
  * can call to publish an artifact into the canvas surface.
  *
- * Why a structural shape (no hard dep on `@usetheo/sdk` or `theokit/server`):
+ * Why a structural shape (no hard dep on `@theokit/sdk` or `theokit/server`):
  * the plugin must work for both SDK consumers and TheoKit apps without
  * forcing the wrong peer dep range on either side. The returned object
  * matches both `defineCustomTool(...)` and `defineAgentTool(...)` shape
  * — apps pass it through their preferred constructor.
  *
  *   ```ts
- *   import { defineArtifactTool } from '@usetheo/plugin-canvas'
+ *   import { defineArtifactTool } from '@theokit/plugin-canvas'
  *   import { defineAgentTool } from 'theokit/server'
  *
  *   const publishArtifact = defineAgentTool(

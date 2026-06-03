@@ -12,9 +12,9 @@ describe('T3.1 — cors-app fixture (real TheoKit boot via D7 cross-repo)', () =
     expect((fixtureConfig.plugins ?? []).length).toBeGreaterThan(0)
   })
 
-  it('fixture plugin is the @usetheo/plugin-cors TheoPlugin shape', () => {
+  it('fixture plugin is the @theokit/plugin-cors TheoPlugin shape', () => {
     const plugins = (fixtureConfig.plugins ?? []) as { name?: string; register?: unknown }[]
-    const cors = plugins.find((p) => p?.name === '@usetheo/plugin-cors')
+    const cors = plugins.find((p) => p?.name === '@theokit/plugin-cors')
     expect(cors).toBeDefined()
     expect(typeof cors?.register).toBe('function')
   })

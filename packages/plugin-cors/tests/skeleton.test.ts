@@ -18,7 +18,7 @@ interface PkgShape {
 describe('T1.1 — plugin-cors scaffold', () => {
   it('package.json has correct shape (EC-1: peer-dep matches current TheoKit)', () => {
     const pkg = JSON.parse(readFileSync(PKG_PATH, 'utf8')) as PkgShape
-    expect(pkg.name).toBe('@usetheo/plugin-cors')
+    expect(pkg.name).toBe('@theokit/plugin-cors')
     expect(pkg.version).toBe('0.1.0')
     expect(pkg.type).toBe('module')
     expect(pkg.exports['.']?.types).toBe('./dist/index.d.ts')
@@ -30,7 +30,7 @@ describe('T1.1 — plugin-cors scaffold', () => {
 
   it('stub default export returns a TheoPlugin shape', () => {
     const plugin = corsPlugin({})
-    expect(plugin.name).toBe('@usetheo/plugin-cors')
+    expect(plugin.name).toBe('@theokit/plugin-cors')
     expect(typeof plugin.register).toBe('function')
   })
 

@@ -1,5 +1,5 @@
 /**
- * @usetheo/plugin-openapi options — Zod single source of truth.
+ * @theokit/plugin-openapi options — Zod single source of truth.
  *
  * Per P#3 plan v1.3 T2.2 + type-safety.md.
  *
@@ -78,7 +78,7 @@ export function validateOpenApiOptions(opts: OpenApiOptions = {}): ValidatedOpen
       .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
       .join('; ')
     throw new OpenApiPluginConfigError(
-      `Invalid @usetheo/plugin-openapi options: ${summary}`,
+      `Invalid @theokit/plugin-openapi options: ${summary}`,
       result.error,
     )
   }

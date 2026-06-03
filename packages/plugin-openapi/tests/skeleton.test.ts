@@ -15,7 +15,7 @@ describe('T2.1 — package skeleton', () => {
       string,
       unknown
     >
-    expect(pkg.name).toBe('@usetheo/plugin-openapi')
+    expect(pkg.name).toBe('@theokit/plugin-openapi')
     expect(pkg.version).toBeDefined()
     expect((pkg.peerDependencies as Record<string, string>).theokit).toMatch(/^>=/)
     expect((pkg.exports as Record<string, unknown>)['.']).toBeDefined()
@@ -37,6 +37,6 @@ describe('T2.1 — package skeleton', () => {
   it('README has Quickstart section + openApiPlugin import snippet', () => {
     const readme = readFileSync(resolve(ROOT, 'README.md'), 'utf-8')
     expect(readme).toMatch(/##\s+Quickstart/i)
-    expect(readme).toMatch(/import openApiPlugin from ['"]@usetheo\/plugin-openapi['"]/)
+    expect(readme).toMatch(/import openApiPlugin from ['"]@theokit\/plugin-openapi['"]/)
   })
 })

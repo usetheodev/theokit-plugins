@@ -55,7 +55,7 @@ export interface VoiceRecorderBarProps {
   language?: string
   /**
    * Render-prop override for the error surface — apps using
-   * `@usetheo/ui` can render their own `<Alert>` here instead of the
+   * `@theokit/ui` can render their own `<Alert>` here instead of the
    * internal `<VoiceAlert>`. Returns `null` for default behavior.
    */
   renderError?: (err: VoicePluginError | Error, retry: () => void) => ReactNode

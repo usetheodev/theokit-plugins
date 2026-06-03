@@ -1,5 +1,5 @@
 /**
- * @usetheo/plugin-cors — CORS middleware for TheoKit.
+ * @theokit/plugin-cors — CORS middleware for TheoKit.
  *
  * Wires `validateCorsOptions` + `resolveOrigin` + `buildCorsHeaders` into a
  * TheoPlugin. Preflight OPTIONS short-circuits with 204 (configurable via
@@ -30,7 +30,7 @@ export default function corsPlugin(options: CorsOptions = {}): TheoPlugin {
   const preflightContinue = opts.preflightContinue === true
 
   return defineTheoPlugin({
-    name: '@usetheo/plugin-cors',
+    name: '@theokit/plugin-cors',
     register(app) {
       // Preflight handler — onRequest, short-circuits with 204 + CORS headers.
       // PluginRunner detects writableEnded/headersSent and stops the hook

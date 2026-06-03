@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest'
 
 const README_PATH = resolve(__dirname, '../README.md')
 
-describe('T4.3 — README polish for @usetheo/plugin-cors', () => {
+describe('T4.3 — README polish for @theokit/plugin-cors', () => {
   it('has Installation section with package manager examples', () => {
     const content = readFileSync(README_PATH, 'utf8')
     expect(content).toContain('## Installation')
-    expect(content).toContain('pnpm add @usetheo/plugin-cors')
+    expect(content).toContain('pnpm add @theokit/plugin-cors')
   })
 
   it('has Quick start with real code example using `cors(`', () => {

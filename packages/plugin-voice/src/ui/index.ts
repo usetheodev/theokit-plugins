@@ -1,5 +1,5 @@
 /**
- * Browser-only UI subpath for @usetheo/plugin-voice.
+ * Browser-only UI subpath for @theokit/plugin-voice.
  *
  * 0.4.0 (T3.4): ships `<VoiceRecorderBar>` + `<TalkOptions>` ready to
  * drop into `ChatComposer.leadingActions`. The `<VoiceAlert>` primitive

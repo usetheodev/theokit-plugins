@@ -4,7 +4,7 @@ import type { ArtifactRendererProps } from './types.js'
 
 /**
  * SlideDeckArtifact — wraps the `<SlideDeck>` composite from the
- * `@usetheo/ui/slide-deck` subpath (RFC 0003). Streams the markdown
+ * `@theokit/ui/slide-deck` subpath (RFC 0003). Streams the markdown
  * source (or pre-parsed slides array) into the deck primitive.
  *
  * The schema accepts either form (`source: string | object[]`) so the
@@ -17,7 +17,7 @@ type SlideDeckComponent = React.ComponentType<{
   'aria-label'?: string
 }>
 const SlideDeck = lazy(async () => {
-  const specifier = '@usetheo/ui/slide-deck'
+  const specifier = '@theokit/ui/slide-deck'
   const mod = (await import(specifier)) as unknown as { SlideDeck: SlideDeckComponent }
   return { default: mod.SlideDeck }
 })

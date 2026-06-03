@@ -1,7 +1,7 @@
 /**
  * Self-contained Alert primitive used by `<VoiceRecorderBar>` to surface
  * permission / device / upstream errors without forcing a peer dep on
- * `@usetheo/ui`. Apps that already render a design-system Alert can
+ * `@theokit/ui`. Apps that already render a design-system Alert can
  * pass their own via the `renderError` prop on the recorder bar.
  *
  * The `kind` prop maps to a `data-state` attribute so consumers can

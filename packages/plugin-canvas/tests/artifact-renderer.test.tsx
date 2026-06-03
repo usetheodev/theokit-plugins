@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * T4.3 — Dispatcher + renderer registry tests. The two engine kinds
- * (`whiteboard-scene`, `slide-deck`) lazy-load their @usetheo/ui
+ * (`whiteboard-scene`, `slide-deck`) lazy-load their @theokit/ui
  * subpaths; jsdom does not resolve those installs so the Suspense
  * fallback is asserted instead of the rendered engine — that's the
  * documented behaviour outside a real browser.
@@ -160,7 +160,7 @@ describe('ArtifactRenderer — dispatch by kind', () => {
     expect(img.getAttribute('data-source')).toBe('url')
   })
 
-  it('whiteboard-scene shows Suspense fallback when @usetheo/ui not installed', () => {
+  it('whiteboard-scene shows Suspense fallback when @theokit/ui not installed', () => {
     const a: Artifact = {
       ...env,
       kind: 'whiteboard-scene',
@@ -172,7 +172,7 @@ describe('ArtifactRenderer — dispatch by kind', () => {
     expect(wrap.textContent ?? '').toMatch(/Loading whiteboard/i)
   })
 
-  it('slide-deck shows Suspense fallback when @usetheo/ui not installed', () => {
+  it('slide-deck shows Suspense fallback when @theokit/ui not installed', () => {
     const a: Artifact = {
       ...env,
       kind: 'slide-deck',

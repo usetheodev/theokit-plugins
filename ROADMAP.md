@@ -6,9 +6,9 @@
 
 | Plugin                   | Status               | Target                                           | ADR                                                                                                           |
 | ------------------------ | -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `@usetheo/plugin-cors`   | ✅ Shipping (v0.1.0) | 2026-Q3                                          | [ADR-0011](https://github.com/usetheodev/theokit/blob/main/docs/adr/0011-moderate-plugin-roadmap-strategy.md) |
-| `@usetheo/plugin-sentry` | 🟡 Proposed          | Start ≤ 2 weeks after cors release; ship 2026-Q3 | [ADR-0012](./docs/adr/0012-plugin-sentry-proposed.md)                                                         |
-| `@usetheo/plugin-i18n`   | 🟡 Proposed          | Start ≤ 6 weeks after cors release; ship 2026-Q4 | [ADR-0013](./docs/adr/0013-plugin-i18n-proposed.md)                                                           |
+| `@theokit/plugin-cors`   | ✅ Shipping (v0.1.0) | 2026-Q3                                          | [ADR-0011](https://github.com/usetheodev/theokit/blob/main/docs/adr/0011-moderate-plugin-roadmap-strategy.md) |
+| `@theokit/plugin-sentry` | 🟡 Proposed          | Start ≤ 2 weeks after cors release; ship 2026-Q3 | [ADR-0012](./docs/adr/0012-plugin-sentry-proposed.md)                                                         |
+| `@theokit/plugin-i18n`   | 🟡 Proposed          | Start ≤ 6 weeks after cors release; ship 2026-Q4 | [ADR-0013](./docs/adr/0013-plugin-i18n-proposed.md)                                                           |
 
 Temporal gates from ADR-0011 D4 — slipping these triggers an explicit follow-up ADR (downgrade "moderate" → "conservative" OR explain the delay).
 
@@ -24,12 +24,12 @@ Gates per plugin (ALL must hold):
 
 | Plugin                                         | Demand evidence today | Why considered (eventually)                                                                                      |
 | ---------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `@usetheo/plugin-otel`                         | 0 apps / 0 requests   | TheoKit has trace context (`x-trace-id` propagation) but no OpenTelemetry exporter — bridge would close that gap |
-| `@usetheo/plugin-resend`                       | 0 / 0                 | Common SaaS need (transactional email); SDK wrapping pattern                                                     |
-| `@usetheo/plugin-stripe-webhooks`              | 0 / 0                 | Sugar over `defineWebhook` adding Stripe signature verification ergonomics                                       |
-| `@usetheo/plugin-clerk` / `-auth0` / `-workos` | 0 / 0 (each)          | Hosted auth bridges; TheoKit ships session + RFC primitives, not vendor bridges                                  |
-| `@usetheo/plugin-feature-flags`                | 0 / 0                 | GrowthBook / LaunchDarkly / Posthog bridges                                                                      |
-| `@usetheo/plugin-inngest` / `-trigger-dev`     | 0 / 0                 | Workflow engine bridges; TheoKit has `defineJob` + outbox, not workflow orchestration                            |
+| `@theokit/plugin-otel`                         | 0 apps / 0 requests   | TheoKit has trace context (`x-trace-id` propagation) but no OpenTelemetry exporter — bridge would close that gap |
+| `@theokit/plugin-resend`                       | 0 / 0                 | Common SaaS need (transactional email); SDK wrapping pattern                                                     |
+| `@theokit/plugin-stripe-webhooks`              | 0 / 0                 | Sugar over `defineWebhook` adding Stripe signature verification ergonomics                                       |
+| `@theokit/plugin-clerk` / `-auth0` / `-workos` | 0 / 0 (each)          | Hosted auth bridges; TheoKit ships session + RFC primitives, not vendor bridges                                  |
+| `@theokit/plugin-feature-flags`                | 0 / 0                 | GrowthBook / LaunchDarkly / Posthog bridges                                                                      |
+| `@theokit/plugin-inngest` / `-trigger-dev`     | 0 / 0                 | Workflow engine bridges; TheoKit has `defineJob` + outbox, not workflow orchestration                            |
 
 ## Exclusions — already in core (don't propose these as plugins)
 
@@ -55,13 +55,13 @@ Per ADR-0011 D5 + edge-case EC-13, every plugin declares an explicit TheoKit pee
 
 | Plugin version               | TheoKit range tested | Notes                                     |
 | ---------------------------- | -------------------- | ----------------------------------------- |
-| `@usetheo/plugin-cors@0.1.x` | `>=0.1.0-alpha.5`    | Initial; aligned to current TheoKit alpha |
+| `@theokit/plugin-cors@0.1.x` | `>=0.1.0-alpha.5`    | Initial; aligned to current TheoKit alpha |
 
-When `@usetheo/plugin-sentry` and `@usetheo/plugin-i18n` ship, they extend this table with their own row.
+When `@theokit/plugin-sentry` and `@theokit/plugin-i18n` ship, they extend this table with their own row.
 
 ## How to propose a new plugin
 
-For first-party (under `@usetheo/plugin-*` scope):
+For first-party (under `@theokit/plugin-*` scope):
 
 1. Open a discussion at https://github.com/usetheodev/theokit/discussions titled `[plugin proposal] <name>`
 2. Show: real production use case, 3+ requests from others, why it can't be a core primitive

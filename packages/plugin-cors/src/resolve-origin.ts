@@ -55,7 +55,7 @@ export function resolveOrigin(
         predicateWarnLogged = true
         const msg = err instanceof Error ? err.message : String(err)
         console.warn(
-          `[@usetheo/plugin-cors] origin predicate threw; treating as no-match (this message logs once per process): ${msg}`,
+          `[@theokit/plugin-cors] origin predicate threw; treating as no-match (this message logs once per process): ${msg}`,
         )
       }
       return null

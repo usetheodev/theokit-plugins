@@ -1,4 +1,4 @@
-# `@usetheo/plugin-canvas`
+# `@theokit/plugin-canvas`
 
 Canvas plugin for TheoKit — agent artifact protocol + side panel UI + agent custom tool.
 
@@ -7,15 +7,15 @@ Render 9 artifact kinds (markdown, code, svg, diff, whiteboard-scene, slide-deck
 ## Installation
 
 ```bash
-pnpm add @usetheo/plugin-canvas @usetheo/ui
+pnpm add @theokit/plugin-canvas @theokit/ui
 ```
 
 ### Required peer dependencies
 
 | Package | Version | Why |
 |---|---|---|
-| `@usetheo/ui` | `>= 0.13.0` | UI primitives (`Button`, `Card`, `CopyButton`, `Tooltip`, `DropdownMenu`, `Alert`, `CodeBlock`, `DiffViewer`, etc.) |
-| `@usetheo/sdk` | `>= 1.0.0` | Agent tool runtime / schema validation |
+| `@theokit/ui` | `>= 0.13.0` | UI primitives (`Button`, `Card`, `CopyButton`, `Tooltip`, `DropdownMenu`, `Alert`, `CodeBlock`, `DiffViewer`, etc.) |
+| `@theokit/sdk` | `>= 1.0.0` | Agent tool runtime / schema validation |
 | `theokit` | `>= 0.1.0-alpha.5` | `defineAgentTool`, `defineAgentEndpoint`, route handlers |
 | `react` | `^18 \|\| ^19` | UI components |
 
@@ -30,8 +30,8 @@ pnpm add @usetheo/plugin-canvas @usetheo/ui
 ```ts
 // server/routes/chat.ts
 import { defineAgentEndpoint, defineAgentTool, streamAgentRun, createConversationHistory } from 'theokit/server'
-import { defineArtifactTool, createArtifactBus } from '@usetheo/plugin-canvas'
-import { createSqliteArtifactStore } from '@usetheo/plugin-canvas'
+import { defineArtifactTool, createArtifactBus } from '@theokit/plugin-canvas'
+import { createSqliteArtifactStore } from '@theokit/plugin-canvas'
 
 // Module-scope singletons — see "Server-side artifact bus" below
 const store = createSqliteArtifactStore({ db: yourSqliteDb })
@@ -85,7 +85,7 @@ export const POST = defineAgentEndpoint({
 
 ```tsx
 // app/page.tsx
-import { CanvasPanel, useCanvas, type Artifact } from '@usetheo/plugin-canvas/ui'
+import { CanvasPanel, useCanvas, type Artifact } from '@theokit/plugin-canvas/ui'
 import { useAgentStream } from 'theokit/client'
 import { useEffect, useRef } from 'react'
 
@@ -129,7 +129,7 @@ export default function Page() {
 `createArtifactBus()` is a process-local pub/sub between the agent tool handler (which emits when `publish_artifact` is called) and the SSE endpoint (which subscribes to forward `tool_result` events to the browser).
 
 ```ts
-import { createArtifactBus } from '@usetheo/plugin-canvas/server'
+import { createArtifactBus } from '@theokit/plugin-canvas/server'
 
 const bus = createArtifactBus()
 bus.subscribe('conversation-123', (artifact) => { /* … */ })
@@ -152,8 +152,8 @@ bus.emit('conversation-123', artifact)
 | `html` | 256 KB | `<iframe sandbox>` with closed enum: `'minimal' \| 'scripts' \| 'forms'` |
 | `mermaid` | 64 KB | Optional `mermaid` peer dep for SVG; falls back to `<CodeBlock>` if missing |
 | `diff` | per hunk | Renders via `DiffViewer` primitive |
-| `whiteboard-scene` | n/a | Lazy-loads `@usetheo/ui/whiteboard` |
-| `slide-deck` | n/a | Lazy-loads `@usetheo/ui/slide-deck` |
+| `whiteboard-scene` | n/a | Lazy-loads `@theokit/ui/whiteboard` |
+| `slide-deck` | n/a | Lazy-loads `@theokit/ui/slide-deck` |
 | `image` | 5 MB | `data:` URL with MIME prefix OR `https://` URL |
 
 ## License

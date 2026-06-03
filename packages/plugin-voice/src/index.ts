@@ -1,5 +1,5 @@
 /**
- * @usetheo/plugin-voice — voice (STT + TTS) plugin for TheoKit.
+ * @theokit/plugin-voice — voice (STT + TTS) plugin for TheoKit.
  *
  * Architecture (0.5.0 — corrected after T3.5 dogfood):
  *
@@ -79,7 +79,7 @@ export default function voicePlugin(options: VoiceOptions = {}): TheoPlugin {
   // EC-6: validate synchronously — boot-time crash beats mid-request 500.
   validateVoiceOptions(options)
   return defineTheoPlugin({
-    name: '@usetheo/plugin-voice',
+    name: '@theokit/plugin-voice',
     register() {
       // intentionally empty — see file docstring
     },

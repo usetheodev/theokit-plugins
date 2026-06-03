@@ -1,5 +1,5 @@
 /**
- * Browser-side audio capture for @usetheo/plugin-voice.
+ * Browser-side audio capture for @theokit/plugin-voice.
  *
  * Wraps `navigator.mediaDevices.getUserMedia` + `MediaRecorder` behind a
  * small Recorder interface so consumers don't need to know about Web
@@ -97,18 +97,18 @@ export function createRecorder(opts: CreateRecorderOptions = {}): Recorder {
     const md = (globalThis as { navigator?: Navigator }).navigator?.mediaDevices
     if (md === undefined) {
       throw new VoicePluginConfigError(
-        '@usetheo/plugin-voice: navigator.mediaDevices is undefined. Voice capture requires a secure context (HTTPS or localhost). See @usetheo/plugin-voice README → Browser requirements.',
+        '@theokit/plugin-voice: navigator.mediaDevices is undefined. Voice capture requires a secure context (HTTPS or localhost). See @theokit/plugin-voice README → Browser requirements.',
       )
     }
     if (typeof md.getUserMedia !== 'function') {
       throw new VoicePluginConfigError(
-        '@usetheo/plugin-voice: navigator.mediaDevices.getUserMedia is missing. The current browser is too old to support voice capture.',
+        '@theokit/plugin-voice: navigator.mediaDevices.getUserMedia is missing. The current browser is too old to support voice capture.',
       )
     }
     const mr = (globalThis as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder
     if (mr === undefined) {
       throw new VoicePluginConfigError(
-        '@usetheo/plugin-voice: MediaRecorder API is not available in this browser.',
+        '@theokit/plugin-voice: MediaRecorder API is not available in this browser.',
       )
     }
   }

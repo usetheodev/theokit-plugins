@@ -13,7 +13,7 @@
  *
  * Renderers are imported eagerly so a synchronous fallback path is
  * always available. The two engines that pull peer deps
- * (`whiteboard`, `slide-deck`) lazy-load their @usetheo/ui subpaths
+ * (`whiteboard`, `slide-deck`) lazy-load their @theokit/ui subpaths
  * internally so the registry itself stays cheap.
  */
 import { CodeArtifact } from './code-artifact.js'

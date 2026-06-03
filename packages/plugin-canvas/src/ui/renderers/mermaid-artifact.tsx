@@ -1,4 +1,4 @@
-import { CodeBlock } from '@usetheo/ui'
+import { CodeBlock } from '@theokit/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import type { ArtifactRendererProps } from './types.js'

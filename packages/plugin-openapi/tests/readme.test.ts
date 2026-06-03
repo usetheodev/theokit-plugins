@@ -22,7 +22,7 @@ describe('T2.3 — README hygiene', () => {
 
   it('has openApiPlugin import snippet referencing the @usetheo scope', () => {
     expect(README).toMatch(
-      /import openApiPlugin from ['"]@usetheo\/plugin-openapi['"]/,
+      /import openApiPlugin from ['"]@theokit\/plugin-openapi['"]/,
     )
   })
 })

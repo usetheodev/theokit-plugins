@@ -1,6 +1,6 @@
 # Fixture — cors-app
 
-Minimal TheoKit app demonstrating `@usetheo/plugin-cors` wired into `theo.config.ts > plugins[]` (T3.1).
+Minimal TheoKit app demonstrating `@theokit/plugin-cors` wired into `theo.config.ts > plugins[]` (T3.1).
 
 ## Layout
 
@@ -11,7 +11,7 @@ Minimal TheoKit app demonstrating `@usetheo/plugin-cors` wired into `theo.config
 
 The fixture proves that:
 
-1. `@usetheo/plugin-cors` integrates with the TheoKit boot path (`defineConfig` accepts the plugin in the `plugins[]` array)
+1. `@theokit/plugin-cors` integrates with the TheoKit boot path (`defineConfig` accepts the plugin in the `plugins[]` array)
 2. The plugin shape (`{ name, register }`) survives the round-trip through `defineConfig`'s normalization
 3. Construction-time validation runs at config load (W3C invalid combos fail-fast)
 

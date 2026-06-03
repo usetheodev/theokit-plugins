@@ -1,5 +1,5 @@
 /**
- * Typed error hierarchy for @usetheo/plugin-canvas.
+ * Typed error hierarchy for @theokit/plugin-canvas.
  *
  * Mirrors the plugin-voice pattern: a base class + 3 stable subclasses
  * apps can use for `instanceof` switches without parsing message
