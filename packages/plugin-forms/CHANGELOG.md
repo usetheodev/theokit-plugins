@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-03 (hotfix — cross-package FormField Context dedup)
+
+### Fixed
+
+- **`<TheoField>` crashed `/memory` page with "FormField subcomponents must be inside <FormField>."** at runtime. Root cause: plugin imported `FormField` via sub-path `@theokit/ui/form-field` (raw chunk served by Vite), while consumer apps typically import `FormField` via main barrel `@theokit/ui` (Vite-optimized bundle). The two import paths produce TWO distinct `FormFieldContext` instances at runtime; `useFormField()` inside the consumer's `<FormField.Control>` reads `null` from the plugin's `<FormField>` provider and throws.
+- Fix: switch plugin's import from `@theokit/ui/form-field` → `@theokit/ui` (main barrel). Both plugin and consumer now share Vite's optimized chunk; single `FormFieldContext` instance.
+- Discovered via `/dogfood-app full` Phase 4-35 (visual /memory page render with Chrome MCP). Previous unit tests didn't catch it because vitest happy-dom uses a single React module + no Vite optimizeDeps bundling.
+
 ## [0.1.1] - 2026-06-03
 
 ### Fixed

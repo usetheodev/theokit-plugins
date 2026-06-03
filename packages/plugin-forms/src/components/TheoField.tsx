@@ -20,7 +20,12 @@
  *     <FormField.Error />
  *   </TheoField>
  */
-import { FormField } from "@theokit/ui/form-field";
+// IMPORTANT: import from main barrel "@theokit/ui" (NOT sub-path
+// "@theokit/ui/form-field"). The sub-path bypasses Vite's optimizeDeps
+// bundling, while consumers typically import via main barrel; mixing
+// produces two FormFieldContext instances at runtime and useFormField()
+// reads null inside <FormField.Control>. Documented as v0.1.2 hotfix.
+import { FormField } from "@theokit/ui";
 import { createContext, useContext, type ReactNode } from "react";
 import { type FieldValues } from "react-hook-form";
 import { useTheoField, type UseTheoFieldResult } from "../hooks/useTheoField.js";

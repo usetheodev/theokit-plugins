@@ -17,6 +17,5 @@ export default defineConfig({
     "theokit",
     "@theokit/react",
     "@theokit/ui",
-    "@theokit/ui/form-field",
   ],
 });
