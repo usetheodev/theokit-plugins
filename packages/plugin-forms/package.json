@@ -22,13 +22,13 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
+    "@hookform/resolvers": "^5.0.0",
+    "@theokit/react": ">=1.1.0",
+    "@theokit/ui": ">=0.13.0",
     "react": ">=19.0.0",
     "react-hook-form": "^7.50.0",
-    "@hookform/resolvers": "^5.0.0",
-    "zod": "^3.25.0 || ^4.0.0",
     "theokit": ">=0.2.3",
-    "@theokit/react": ">=1.1.0",
-    "@theokit/ui": ">=0.13.0"
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "@theokit/ui": {
@@ -41,13 +41,13 @@
     "@theokit/react": "^1.1.0",
     "@theokit/ui": "^0.13.0",
     "@types/react": "^19.0.0",
-    "happy-dom": "^15.0.0",
+    "happy-dom": "^20.9.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.50.0",
     "theokit": "link:../../../theokit/packages/theo",
     "tsup": "^8.5.0",
-    "vitest": "^2.1.9",
+    "vitest": "^4.1.8",
     "zod": "^3.25.76"
   },
   "publishConfig": {

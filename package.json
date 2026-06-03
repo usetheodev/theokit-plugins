@@ -29,7 +29,8 @@
     "tsup": "^8.5.1",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8",
-    "vitest": "^3.0.0"
+    "vite": "^7.3.5",
+    "vitest": "^4.1.8"
   },
   "repository": {
     "type": "git",
