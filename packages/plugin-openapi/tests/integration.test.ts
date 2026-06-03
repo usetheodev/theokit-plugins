@@ -88,22 +88,29 @@ describe('T3.3 — registration', () => {
 })
 
 describe('T3.3 — GET /api/docs serves HTML', () => {
-  it('returns 200 + text/html + Scalar CDN embed via data-url attribute', async () => {
-    // v0.1.1 fix: assertion was `Scalar.createApiReference` (inline init)
-    // — now asserts the data-url attribute pattern that boots Scalar without
-    // requiring 'unsafe-inline' in script-src CSP.
+  it('returns 200 + text/html + Scalar two-script embed (id=api-reference + bundle src)', async () => {
+    // v0.1.1: data-url attribute pattern (CSP-friendly, no inline JS body).
+    // v0.1.3: split into TWO script tags per Scalar 1.58 integration —
+    //   <script id="api-reference" data-url="..."> config carrier
+    //   <script src="<cdn>"> bundle script
+    // The single-tag attribute attempt from v0.1.1 was silently ignored by
+    // Scalar 1.58 → blank page (found via Chrome DevTools `#app` empty
+    // after `window.Scalar` was already defined).
     const runner = await makeRunnerWith()
     const ctx = mockCtx('GET', '/api/docs')
     await runner.runOnRequest(ctx as never)
     expect(ctx.response.statusCode).toBe(200)
     expect(ctx.response._headers['Content-Type']).toMatch(/text\/html/)
     expect(ctx.response._body).toMatch(
-      /<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/@scalar\/api-reference"\s+data-url="\/api\/docs\/openapi\.json"/,
+      /<script\s+id="api-reference"\s+data-url="\/api\/docs\/openapi\.json"\s*>/,
+    )
+    expect(ctx.response._body).toMatch(
+      /<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/@scalar\/api-reference"\s*>/,
     )
     expect(ctx.response._body).toMatch(/<!doctype html>/i)
   })
 
-  it('REGRESSION v0.1.1: /api/docs response sets per-route Content-Security-Policy allowing CDN host', async () => {
+  it('REGRESSION v0.1.1+v0.1.2: /api/docs response sets per-route Content-Security-Policy allowing CDN host', async () => {
     // theokit default CSP (`script-src 'self'`) blocks both Scalar CDN +
     // any inline init script, causing the page to render blank. Plugin must
     // override CSP per-response for /api/docs to allow the CDN origin.
@@ -114,12 +121,30 @@ describe('T3.3 — GET /api/docs serves HTML', () => {
     expect(csp, 'plugin must set Content-Security-Policy on /api/docs response').toBeDefined()
     // CDN origin must be in script-src
     expect(csp).toMatch(/script-src[^;]*\bhttps:\/\/cdn\.jsdelivr\.net\b/)
+    // v0.1.2: 'unsafe-eval' MUST be present in script-src — Scalar's bundle
+    // uses eval() internally for Vue runtime template compilation. Without
+    // it the bundle loads but the Vue app cannot mount → blank page.
+    const scriptSrcDirective = csp.split(';').find((d: string) => d.trim().startsWith('script-src'))
+    expect(scriptSrcDirective).toMatch(/'unsafe-eval'/)
     // Must NOT contain 'unsafe-inline' for script-src (data-attribute pattern
     // means we don't need it; absence proves the fix is real, not a workaround)
-    const scriptSrcDirective = csp.split(';').find((d: string) => d.trim().startsWith('script-src'))
     expect(scriptSrcDirective).not.toMatch(/'unsafe-inline'/)
     // frame-ancestors must remain 'none' (clickjacking defense, OWASP A05)
     expect(csp).toMatch(/frame-ancestors\s+'none'/)
+  })
+
+  it('REGRESSION v0.1.2: openapi.json response does NOT include unsafe-eval (narrow scoping)', async () => {
+    // 'unsafe-eval' on script-src is needed ONLY for /api/docs (Scalar's
+    // Vue runtime). The JSON endpoint must NOT carry it — proves the
+    // exception is scoped, not blanket.
+    const tmpDir = join(tmpCwd, '.theo')
+    mkdirSync(tmpDir, { recursive: true })
+    writeFileSync(join(tmpDir, 'openapi.json'), JSON.stringify({ openapi: '3.0.3' }))
+    const runner = await makeRunnerWith()
+    const ctx = mockCtx('GET', '/api/docs/openapi.json')
+    await runner.runOnRequest(ctx as never)
+    const csp = ctx.response._headers['Content-Security-Policy']
+    expect(csp).toBeUndefined()
   })
 
   it('REGRESSION v0.1.1: /api/docs CSP uses custom cdnUrl host when consumer overrides cdnUrl', async () => {
@@ -173,8 +198,10 @@ describe('T3.3 — GET /api/docs serves HTML', () => {
     const runner = await makeRunnerWith({ cdnUrl: 'https://my-cdn.com/s.js' })
     const ctx = mockCtx('GET', '/api/docs')
     await runner.runOnRequest(ctx as never)
-    // v0.1.1 data-attribute pattern — `data-url` follows `src` on the same tag
-    expect(ctx.response._body).toMatch(/<script\s+src="https:\/\/my-cdn\.com\/s\.js"\s+data-url=/)
+    // v0.1.3 two-script pattern — the bundle src tag stays clean (no data-url)
+    expect(ctx.response._body).toMatch(/<script\s+src="https:\/\/my-cdn\.com\/s\.js"\s*>/)
+    // and the config tag carries data-url separately
+    expect(ctx.response._body).toMatch(/<script\s+id="api-reference"\s+data-url=/)
   })
 })
 
