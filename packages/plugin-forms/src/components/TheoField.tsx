@@ -1,9 +1,17 @@
 /**
  * Phase 4 / T4.2 — <TheoField name="..."> styled tier component.
  *
- * Per plan p4-plugin-forms v1.1 ADR D6 (styled tier + optional `@theokit/ui` peer).
+ * Per plan p4-plugin-forms v1.1 ADR D6 (styled tier wrapping @theokit/ui FormField).
  *
- * Composition (v0.1):
+ * v0.1.1 change (P#4 EC-10 hardening):
+ *   Previous v0.1.0 used `(globalThis as {require?...}).require?.(...)` lazy
+ *   loader that ALWAYS fails in browser ESM context (globalThis.require is
+ *   undefined). Switched to a static ESM import — clearer failure mode:
+ *   importing <TheoField> without `@theokit/ui` installed produces a module-
+ *   resolution error at load time, not a render-time throw. Consumers without
+ *   @theokit/ui MUST use `useTheoField()` headless hook (still works peer-free).
+ *
+ * Composition (v0.1.x):
  *   <TheoField name="email">
  *     <FormField.Label>Email</FormField.Label>
  *     <FormField.Control>
@@ -11,54 +19,11 @@
  *     </FormField.Control>
  *     <FormField.Error />
  *   </TheoField>
- *
- * Wiring:
- *   1. useTheoField(name) reads RHF state (value, error, register)
- *   2. <FormField invalid={isInvalid}> from @theokit/ui (lazy peer-dep)
- *   3. Children read register via `useTheoFieldRegister()` exported hook
- *      (no cloneElement magic; consumer pulls the props explicitly)
- *
- * Why explicit hook over cloneElement: keeps the data flow visible; avoids
- * brittle tree-walking when consumers wrap inputs in extra divs. Mirrors
- * Radix's "headless primitives + consumer-controlled rendering" philosophy.
  */
+import { FormField } from "@theokit/ui/form-field";
 import { createContext, useContext, type ReactNode } from "react";
 import { type FieldValues } from "react-hook-form";
 import { useTheoField, type UseTheoFieldResult } from "../hooks/useTheoField.js";
-
-// Lazy resolve @theokit/ui FormField (optional peer-dep per D6 / EC-10).
-type FormFieldComponent = React.ComponentType<{
-  invalid?: boolean;
-  children: ReactNode;
-}>;
-
-let FormFieldImpl: FormFieldComponent | null = null;
-let FormFieldImplFailed = false;
-
-function loadFormField(): FormFieldComponent | null {
-  if (FormFieldImpl !== null) return FormFieldImpl;
-  if (FormFieldImplFailed) return null;
-  try {
-    // Synchronous CJS-style require via createRequire would be ideal but ESM
-    // forbids it. We use a static dynamic-import marker resolved at first call.
-    // For v0.1 we assume @theokit/ui IS installed when TheoField is imported.
-    // Consumers without it: use useTheoField() headless hook instead.
-    // Bundlers (Vite) resolve this at build time via tree-shaking.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-    const mod = (globalThis as { require?: (id: string) => unknown }).require?.(
-      "@theokit/ui/form-field",
-    ) as { FormField: FormFieldComponent } | undefined;
-    if (mod === undefined) {
-      FormFieldImplFailed = true;
-      return null;
-    }
-    FormFieldImpl = mod.FormField;
-    return FormFieldImpl;
-  } catch {
-    FormFieldImplFailed = true;
-    return null;
-  }
-}
 
 /**
  * Internal Context — supplies the current field's useTheoField result to
@@ -115,14 +80,6 @@ export function TheoField<_TInput extends FieldValues = FieldValues>(
 ): React.JSX.Element {
   const { name, children } = props;
   const field = useTheoField(name);
-  const FormField = loadFormField();
-  if (FormField === null) {
-    throw new Error(
-      "<TheoField> requires @theokit/ui — install with: pnpm add @theokit/ui. " +
-        "Or use the headless useTheoField() hook for non-@theokit/ui consumers.",
-    );
-  }
-
   return (
     <TheoFieldScopeContext.Provider value={field}>
       <FormField invalid={field.isInvalid}>{children}</FormField>
