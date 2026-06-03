@@ -1,26 +1,29 @@
 /**
  * Pure HTML payload renderer for `/api/docs`.
  *
- * Per P#3 plan v1.3 T3.1 + ADR D1 (Scalar via CDN) + EC-1 absorbed
- * (JSON.stringify for JS-string context).
+ * Per P#3 plan v1.3 T3.1 + ADR D1 (Scalar via CDN).
  *
- * Defense-in-depth XSS escaping:
- *   - pageTitle → escapeHtml (HTML text-content context)
- *   - cdnUrl    → escapeAttr (HTML attribute context; also Zod-validated as URL)
- *   - openapiJsonPath → JSON.stringify (JS-string context inside <script>)
+ * **2026-06-03 CSP-friendly fix (v0.1.1):** the previous version emitted
+ * a SECOND inline `<script>Scalar.createApiReference('#app', {...})</script>`
+ * to bootstrap Scalar. That inline script is blocked by any `script-src 'self'`
+ * CSP (theokit's default since 0.2.x), causing the page to render blank in
+ * production-shaped apps. The fix uses Scalar's documented data-attribute
+ * init pattern (`<script src="..." data-url="..."></script>`) — Scalar's
+ * bundle reads attributes off its own script tag at load time, no inline
+ * JS needed. Combined with the per-response CSP header set in `index.ts`,
+ * the page renders under strict `script-src 'self'` defaults.
  *
- * JSON.stringify is the ONLY correct serialization for embedding values
- * inside an inline <script>. escapeAttr would break on apostrophes in the
- * path; JSON.stringify produces "..."-wrapped JS-string-safe output with
- * all delimiters + control chars + </script> sequences escaped per
- * ECMA-404.
+ * Defense-in-depth XSS escaping (no inline JS context anymore):
+ *   - pageTitle       → escapeHtml (HTML text-content context)
+ *   - cdnUrl          → escapeAttr (HTML attribute context; Zod-validated)
+ *   - openapiJsonPath → escapeAttr (HTML attribute context — `data-url`)
  */
 import type { ValidatedOpenApiOptions } from './options.js'
 
 export function renderScalarHtml(opts: ValidatedOpenApiOptions): string {
   const safeTitle = escapeHtml(opts.pageTitle)
   const safeCdnUrl = escapeAttr(opts.cdnUrl)
-  const jsonPathLiteral = JSON.stringify(opts.openapiJsonPath)
+  const safeJsonPath = escapeAttr(opts.openapiJsonPath)
 
   return `<!doctype html>
 <html>
@@ -31,13 +34,24 @@ export function renderScalarHtml(opts: ValidatedOpenApiOptions): string {
   </head>
   <body>
     <div id="app"></div>
-    <script src="${safeCdnUrl}"></script>
-    <script>
-      Scalar.createApiReference('#app', { url: ${jsonPathLiteral} });
-    </script>
+    <script src="${safeCdnUrl}" data-url="${safeJsonPath}"></script>
   </body>
 </html>
 `
+}
+
+/**
+ * Compute the CSP `script-src` source list for the `/api/docs` response.
+ * Extracted as pure function for testability + reuse from `index.ts` when
+ * setting the per-response Content-Security-Policy header.
+ *
+ * Returns the host origin of cdnUrl ("https://cdn.jsdelivr.net") so it can
+ * be appended to the consumer's CSP without granting wildcard CDN access.
+ */
+export function cdnHostForCsp(cdnUrl: string): string {
+  // Parse via URL — Zod already validated url() so this never throws.
+  const u = new URL(cdnUrl)
+  return `${u.protocol}//${u.host}`
 }
 
 function escapeHtml(s: string): string {

@@ -88,14 +88,61 @@ describe('T3.3 — registration', () => {
 })
 
 describe('T3.3 — GET /api/docs serves HTML', () => {
-  it('returns 200 + text/html + Scalar embed', async () => {
+  it('returns 200 + text/html + Scalar CDN embed via data-url attribute', async () => {
+    // v0.1.1 fix: assertion was `Scalar.createApiReference` (inline init)
+    // — now asserts the data-url attribute pattern that boots Scalar without
+    // requiring 'unsafe-inline' in script-src CSP.
     const runner = await makeRunnerWith()
     const ctx = mockCtx('GET', '/api/docs')
     await runner.runOnRequest(ctx as never)
     expect(ctx.response.statusCode).toBe(200)
     expect(ctx.response._headers['Content-Type']).toMatch(/text\/html/)
-    expect(ctx.response._body).toMatch(/Scalar\.createApiReference/)
+    expect(ctx.response._body).toMatch(
+      /<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/@scalar\/api-reference"\s+data-url="\/api\/docs\/openapi\.json"/,
+    )
     expect(ctx.response._body).toMatch(/<!doctype html>/i)
+  })
+
+  it('REGRESSION v0.1.1: /api/docs response sets per-route Content-Security-Policy allowing CDN host', async () => {
+    // theokit default CSP (`script-src 'self'`) blocks both Scalar CDN +
+    // any inline init script, causing the page to render blank. Plugin must
+    // override CSP per-response for /api/docs to allow the CDN origin.
+    const runner = await makeRunnerWith()
+    const ctx = mockCtx('GET', '/api/docs')
+    await runner.runOnRequest(ctx as never)
+    const csp = ctx.response._headers['Content-Security-Policy']
+    expect(csp, 'plugin must set Content-Security-Policy on /api/docs response').toBeDefined()
+    // CDN origin must be in script-src
+    expect(csp).toMatch(/script-src[^;]*\bhttps:\/\/cdn\.jsdelivr\.net\b/)
+    // Must NOT contain 'unsafe-inline' for script-src (data-attribute pattern
+    // means we don't need it; absence proves the fix is real, not a workaround)
+    const scriptSrcDirective = csp.split(';').find((d: string) => d.trim().startsWith('script-src'))
+    expect(scriptSrcDirective).not.toMatch(/'unsafe-inline'/)
+    // frame-ancestors must remain 'none' (clickjacking defense, OWASP A05)
+    expect(csp).toMatch(/frame-ancestors\s+'none'/)
+  })
+
+  it('REGRESSION v0.1.1: /api/docs CSP uses custom cdnUrl host when consumer overrides cdnUrl', async () => {
+    const runner = await makeRunnerWith({ cdnUrl: 'https://my-cdn.example.com/scalar.js' })
+    const ctx = mockCtx('GET', '/api/docs')
+    await runner.runOnRequest(ctx as never)
+    const csp = ctx.response._headers['Content-Security-Policy']
+    expect(csp).toMatch(/script-src[^;]*\bhttps:\/\/my-cdn\.example\.com\b/)
+    expect(csp).not.toMatch(/jsdelivr/)
+  })
+
+  it('REGRESSION v0.1.1: openapi.json response does NOT get the docs-page CSP override (only /api/docs does)', async () => {
+    // Belt + suspenders: the docs-page CSP allows external host. The JSON
+    // endpoint must NOT carry it — it serves JSON, not HTML, and shouldn't
+    // need the CDN allowance. Per-route scoping defense.
+    const tmpDir = join(tmpCwd, '.theo')
+    mkdirSync(tmpDir, { recursive: true })
+    writeFileSync(join(tmpDir, 'openapi.json'), JSON.stringify({ openapi: '3.1.0' }))
+    const runner = await makeRunnerWith()
+    const ctx = mockCtx('GET', '/api/docs/openapi.json')
+    await runner.runOnRequest(ctx as never)
+    expect(ctx.response.statusCode).toBe(200)
+    expect(ctx.response._headers['Content-Security-Policy']).toBeUndefined()
   })
 
   it('respects custom docsPath', async () => {
@@ -113,18 +160,21 @@ describe('T3.3 — GET /api/docs serves HTML', () => {
     expect(ctx.response.statusCode).toBe(200)
   })
 
-  it('embeds the openapiJsonPath in Scalar init (custom path)', async () => {
+  it('embeds the openapiJsonPath in Scalar data-url attribute (custom path)', async () => {
+    // v0.1.1 fix: was `url: "/x.json"` inside inline init script; now
+    // `data-url="/x.json"` attribute on the CDN script tag.
     const runner = await makeRunnerWith({ openapiJsonPath: '/x.json' })
     const ctx = mockCtx('GET', '/api/docs')
     await runner.runOnRequest(ctx as never)
-    expect(ctx.response._body).toMatch(/url:\s*"\/x\.json"/)
+    expect(ctx.response._body).toMatch(/data-url="\/x\.json"/)
   })
 
   it('embeds custom cdnUrl', async () => {
     const runner = await makeRunnerWith({ cdnUrl: 'https://my-cdn.com/s.js' })
     const ctx = mockCtx('GET', '/api/docs')
     await runner.runOnRequest(ctx as never)
-    expect(ctx.response._body).toMatch(/<script src="https:\/\/my-cdn\.com\/s\.js">/)
+    // v0.1.1 data-attribute pattern — `data-url` follows `src` on the same tag
+    expect(ctx.response._body).toMatch(/<script\s+src="https:\/\/my-cdn\.com\/s\.js"\s+data-url=/)
   })
 })
 
