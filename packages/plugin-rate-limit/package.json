@@ -1,0 +1,52 @@
+{
+  "name": "@theokit/plugin-rate-limit",
+  "version": "0.1.0",
+  "description": "Rate-limit plugin for TheoKit — sliding-window / token-bucket / fixed-window algorithms; Memory default + Redis (ioredis) adapter; unified HTTP+WS middleware; withRateLimit wrapper for G8 subscriptions + P#9 realtime. Form 4 Hybrid per plan p10-plugin-rate-limit v1.0.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "theokit": ">=0.4.0-beta.0",
+    "@theokit/sdk": ">=1.7.0",
+    "ioredis": "^5",
+    "@types/ioredis": "*"
+  },
+  "peerDependenciesMeta": {
+    "@theokit/sdk": { "optional": true },
+    "ioredis": { "optional": true },
+    "@types/ioredis": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "ioredis": "^5.4.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.0"
+  },
+  "keywords": [
+    "theokit",
+    "theokit-plugin",
+    "rate-limit",
+    "rate-limiting",
+    "sliding-window",
+    "token-bucket",
+    "redis",
+    "lua"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
