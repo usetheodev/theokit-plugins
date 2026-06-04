@@ -16,13 +16,16 @@ describe("@theokit/auth-google — scaffold (T2.1)", () => {
     expect(typeof google).toBe("function");
   });
 
-  it("google() throws TODO until T2.2 lands", () => {
+  it("google() returns AuthProvider object with name + createAuthorizationURL + handleCallback", () => {
     const opts: GoogleProviderOptions = {
       clientId: "test-client-id",
       clientSecret: "test-client-secret",
       redirectUri: "https://example.com/api/auth/google/callback",
     };
-    expect(() => google(opts)).toThrow(/T2\.2/);
+    const provider = google(opts);
+    expect(provider.name).toBe("google");
+    expect(typeof provider.createAuthorizationURL).toBe("function");
+    expect(typeof provider.handleCallback).toBe("function");
   });
 
   it("GoogleProfile type preserves sub case sensitivity (Wasp incident lesson)", () => {
