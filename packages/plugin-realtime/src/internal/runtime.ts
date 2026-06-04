@@ -1,0 +1,244 @@
+/**
+ * @theokit/plugin-realtime — RealtimeRuntime (P#9 internal orchestrator).
+ *
+ * Per ADR D3 (defineRoom factory) + D5 (G8 subscribe ONLY transport).
+ *
+ * Holds room descriptor registry + bridges incoming WS subscription frames
+ * to the configured {@link RealtimeProvider}. WireFrame envelope semantic
+ * event types: `presence-update`, `broadcast`, `yjs-update`, `yjs-awareness`.
+ *
+ * @internal
+ */
+
+import {
+  type AuthorizeContext,
+  type BroadcastPayload,
+  type ConnectionInfo,
+  type Presence,
+  RealtimeAuthorizationError,
+  RealtimeBroadcastError,
+  type RealtimeFrame,
+  RealtimePresenceError,
+  type RealtimeProvider,
+  RealtimeRoomNotFoundError,
+  type RealtimeUnsubscribe,
+  type RoomDescriptor,
+} from "../types.js";
+
+/**
+ * Incoming wire frame from a client (over G8 subscribe transport).
+ *
+ * @public
+ */
+export type InboundWireFrame =
+  | { readonly kind: "presence-update"; readonly patch: Partial<Presence> }
+  | {
+      readonly kind: "broadcast";
+      readonly event: string;
+      readonly payload: BroadcastPayload;
+    }
+  | { readonly kind: "yjs-update"; readonly bytes: Uint8Array }
+  | { readonly kind: "yjs-awareness"; readonly bytes: Uint8Array };
+
+/**
+ * Outgoing wire frame to a client (re-broadcast from {@link RealtimeFrame}).
+ *
+ * @public
+ */
+export type OutboundWireFrame = RealtimeFrame;
+
+/**
+ * Options for {@link RealtimeRuntime}.
+ *
+ * @public
+ */
+export interface RealtimeRuntimeOptions {
+  /** RealtimeProvider implementation (Memory default or Yjs opt-in). */
+  provider: RealtimeProvider;
+  /** Room descriptors to register at construction. */
+  rooms?: ReadonlyArray<RoomDescriptor>;
+}
+
+/**
+ * In-process runtime that registers rooms + bridges WS frames to the provider.
+ *
+ * @public
+ */
+export class RealtimeRuntime {
+  private readonly provider: RealtimeProvider;
+  private readonly rooms = new Map<string, RoomDescriptor>();
+
+  constructor(opts: RealtimeRuntimeOptions) {
+    if (opts === null || typeof opts !== "object") {
+      throw new TypeError("RealtimeRuntime: options object is required");
+    }
+    if (opts.provider === undefined) {
+      throw new TypeError("RealtimeRuntime: opts.provider is required");
+    }
+    this.provider = opts.provider;
+    if (opts.rooms !== undefined) {
+      for (const room of opts.rooms) {
+        this.registerRoom(room);
+      }
+    }
+  }
+
+  /** Register a {@link RoomDescriptor}. Idempotent (replaces existing by id). */
+  registerRoom(room: RoomDescriptor): void {
+    this.rooms.set(room.id, room);
+  }
+
+  /** Unregister a room by id. Returns `true` if removed. */
+  unregisterRoom(id: string): boolean {
+    return this.rooms.delete(id);
+  }
+
+  /** Look up a registered room descriptor. */
+  getRoom(id: string): RoomDescriptor | undefined {
+    return this.rooms.get(id);
+  }
+
+  /**
+   * Handle a new connection joining a room. Runs the room's `authorize` hook
+   * + validates initial presence + delegates to provider. Returns a handle
+   * with `unsubscribe` + frame dispatcher for the subscription lifecycle.
+   */
+  async handleConnection(
+    roomId: string,
+    connection: ConnectionInfo,
+    initialPresence: Presence | undefined,
+    onFrame: (frame: OutboundWireFrame) => void,
+  ): Promise<RealtimeConnectionHandle> {
+    const room = this.rooms.get(roomId);
+    if (room === undefined) {
+      throw new RealtimeRoomNotFoundError(roomId);
+    }
+    // Authorize hook.
+    if (room.authorize !== undefined) {
+      const ctx: AuthorizeContext = { roomId, connection };
+      const ok = await room.authorize(ctx);
+      if (!ok) {
+        throw new RealtimeAuthorizationError(roomId);
+      }
+    }
+    // Validate initial presence (if provided).
+    let validatedInitial: Presence | undefined;
+    if (initialPresence !== undefined) {
+      const parsed = room.presence.safeParse(initialPresence);
+      if (!parsed.success) {
+        throw new RealtimePresenceError(
+          `Invalid initial presence for room ${roomId}`,
+          { issues: parsed.error },
+        );
+      }
+      validatedInitial = parsed.data as Presence;
+    }
+    // Subscribe to provider frames + bridge to onFrame.
+    const unsubscribe = this.provider.subscribeRoom(roomId, onFrame);
+    // Join the room.
+    await this.provider.joinRoom(roomId, connection, validatedInitial);
+    return new RealtimeConnectionHandle(
+      this,
+      roomId,
+      connection.connectionId,
+      unsubscribe,
+    );
+  }
+
+  /**
+   * Dispatch an inbound wire frame from a connection. Validates per the
+   * registered room descriptor (presence + broadcast schemas) + delegates
+   * to the provider.
+   */
+  async dispatchFrame(
+    roomId: string,
+    connectionId: string,
+    frame: InboundWireFrame,
+  ): Promise<void> {
+    const room = this.rooms.get(roomId);
+    if (room === undefined) {
+      throw new RealtimeRoomNotFoundError(roomId);
+    }
+    switch (frame.kind) {
+      case "presence-update": {
+        // Validate the FULL merged shape, not just the patch — we treat patches
+        // as partial overlays; consumers can opt for strict validation via
+        // schema design (e.g., z.object({}).partial()).
+        const parsed = room.presence.safeParse(frame.patch);
+        if (!parsed.success) {
+          throw new RealtimePresenceError(
+            `Invalid presence patch for room ${roomId}`,
+            { issues: parsed.error },
+          );
+        }
+        await this.provider.updatePresence(roomId, connectionId, parsed.data as Presence);
+        return;
+      }
+      case "broadcast": {
+        const parsed = room.broadcast.safeParse(frame.payload);
+        if (!parsed.success) {
+          throw new RealtimeBroadcastError(
+            `Invalid broadcast payload for room ${roomId}`,
+            { issues: parsed.error },
+          );
+        }
+        await this.provider.broadcast(
+          roomId,
+          connectionId,
+          frame.event,
+          parsed.data as BroadcastPayload,
+        );
+        return;
+      }
+      case "yjs-update": {
+        if (this.provider.applyYjsUpdate === undefined) {
+          // Silently drop — provider doesn't support Yjs (e.g., MemoryProvider).
+          return;
+        }
+        await this.provider.applyYjsUpdate(roomId, connectionId, frame.bytes);
+        return;
+      }
+      case "yjs-awareness": {
+        if (this.provider.applyYjsAwareness === undefined) {
+          return;
+        }
+        await this.provider.applyYjsAwareness(roomId, connectionId, frame.bytes);
+        return;
+      }
+    }
+  }
+
+  /** Internal — accessor for connection handles. */
+  async leaveRoom(roomId: string, connectionId: string): Promise<void> {
+    await this.provider.leaveRoom(roomId, connectionId);
+  }
+
+  /** Read-only snapshot of presence for ops visibility. */
+  getPresence(roomId: string): Promise<Record<string, Presence>> {
+    return this.provider.getPresence(roomId);
+  }
+}
+
+/**
+ * Handle returned by {@link RealtimeRuntime.handleConnection}. Call
+ * `release()` on disconnect to leave the room + unsubscribe.
+ *
+ * @public
+ */
+export class RealtimeConnectionHandle {
+  private released = false;
+
+  constructor(
+    private readonly runtime: RealtimeRuntime,
+    readonly roomId: string,
+    readonly connectionId: string,
+    private readonly unsubscribe: RealtimeUnsubscribe,
+  ) {}
+
+  async release(): Promise<void> {
+    if (this.released) return;
+    this.released = true;
+    this.unsubscribe();
+    await this.runtime.leaveRoom(this.roomId, this.connectionId);
+  }
+}
