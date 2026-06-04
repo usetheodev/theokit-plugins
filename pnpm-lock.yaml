@@ -167,6 +167,45 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(happy-dom@20.9.0)(jsdom@25.0.1)
 
+  packages/plugin-copilot:
+    devDependencies:
+      '@testing-library/dom':
+        specifier: ^10.0.0
+        version: 10.4.1
+      '@testing-library/react':
+        specifier: ^16.0.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@theokit/sdk':
+        specifier: ^1.6.0
+        version: 1.6.0(zod@4.4.3)
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.19.19
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.15
+      jsdom:
+        specifier: ^25.0.0
+        version: 25.0.1
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.8(@types/node@22.19.19)(happy-dom@20.9.0)(jsdom@25.0.1)
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+
   packages/plugin-cors:
     dependencies:
       zod:
@@ -5853,7 +5892,7 @@ snapshots:
 
   happy-dom@20.9.0:
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 22.19.19
       '@types/whatwg-mimetype': 3.0.2
       '@types/ws': 8.18.1
       entities: 7.0.1
@@ -6536,7 +6575,7 @@ snapshots:
 
   stripe@14.25.0:
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 22.19.19
       qs: 6.15.2
 
   strnum@2.3.0: {}
