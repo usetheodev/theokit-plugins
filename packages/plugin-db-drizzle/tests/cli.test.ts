@@ -1,0 +1,98 @@
+/**
+ * RED tests for P#5 T2.1 — CLI verb wiring
+ *
+ * Per plan p5-plugin-db-drizzle v1.0 § Phase 2 / T2.1. 7 verbs:
+ * generate/migrate/push/studio/reset/seed/check.
+ *
+ * Tests assert the buildArgs() factory shapes; child_process spawn is NOT
+ * exercised here (integration-test territory).
+ */
+import { describe, expect, it } from "vitest";
+
+import { buildDbCommands, type DbVerb } from "../src/cli/db.js";
+import { resolveOptions } from "../src/options.js";
+
+const REQUIRED_VERBS: ReadonlyArray<DbVerb> = [
+  "generate",
+  "migrate",
+  "push",
+  "studio",
+  "reset",
+  "seed",
+  "check",
+];
+
+describe("buildDbCommands (P#5 T2.1) — 7 verbs", () => {
+  it("emits exactly 7 commands covering canonical verb set", () => {
+    // Given: resolved opts
+    const opts = resolveOptions({ driver: "sqlite", url: ":memory:" });
+
+    // When: commands built
+    const cmds = buildDbCommands(opts);
+
+    // Then: each canonical verb is present
+    expect(cmds).toHaveLength(7);
+    const verbs = cmds.map((c) => c.verb).sort();
+    expect(verbs).toEqual([...REQUIRED_VERBS].sort());
+  });
+
+  it("includes a human-readable summary per verb", () => {
+    const opts = resolveOptions({ driver: "sqlite", url: ":memory:" });
+
+    // Then: every command has a non-empty summary
+    for (const cmd of buildDbCommands(opts)) {
+      expect(cmd.summary.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("buildArgs returns drizzle-kit args with schema flag for every verb", () => {
+    // Given: opts with explicit schemaPath
+    const opts = resolveOptions({
+      driver: "postgres",
+      url: "postgres://x",
+      schemaPath: "./custom/schema.ts",
+    });
+
+    // Then: every verb passes --schema to drizzle-kit
+    for (const cmd of buildDbCommands(opts)) {
+      const args = cmd.buildArgs(opts);
+      expect(args[0]).toBe(cmd.verb);
+      expect(args).toContain("--schema");
+      expect(args).toContain("./custom/schema.ts");
+    }
+  });
+
+  it("generate verb additionally passes --out pointing at migrationsPath", () => {
+    // Given: opts with explicit migrationsPath
+    const opts = resolveOptions({
+      driver: "postgres",
+      url: "postgres://x",
+      migrationsPath: "./drizzle/migrations",
+    });
+
+    const cmds = buildDbCommands(opts);
+    const generate = cmds.find((c) => c.verb === "generate");
+
+    // Then: generate's args contain --out with the custom path
+    expect(generate).toBeDefined();
+    const args = generate?.buildArgs(opts) ?? [];
+    expect(args).toContain("--out");
+    expect(args).toContain("./drizzle/migrations");
+  });
+
+  it("non-generate verbs do NOT include --out flag", () => {
+    const opts = resolveOptions({
+      driver: "sqlite",
+      url: ":memory:",
+      migrationsPath: "./drizzle/migrations",
+    });
+
+    // Then: only `generate` writes; runtime verbs (migrate/push/studio/seed/check/reset)
+    // don't need --out
+    for (const verb of ["migrate", "push", "studio", "reset", "seed", "check"] as DbVerb[]) {
+      const cmd = buildDbCommands(opts).find((c) => c.verb === verb);
+      const args = cmd?.buildArgs(opts) ?? [];
+      expect(args).not.toContain("--out");
+    }
+  });
+});
