@@ -37,5 +37,10 @@ jobs:
           version: pnpm version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # NPM_TOKEN intentionally absent — per technical-hardening-sprint plan v1.1 EC-2
+          # absorbed: NPM_TOKEN env DISABLES OIDC trusted-publisher binding silently.
+          # npm CLI prioritizes token auth over the OIDC token from id-token: write
+          # permission, so --provenance silently no-ops. Without NPM_TOKEN, npm CLI
+          # uses the GitHub Actions OIDC token automatically (requires npm dashboard
+          # trusted-publisher binding configured at npmjs.com/package/<pkg>/settings).
           NPM_CONFIG_PROVENANCE: true

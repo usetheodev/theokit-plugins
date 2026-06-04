@@ -1,7 +1,7 @@
 {
   "name": "@theokit/plugin-cors",
   "version": "0.1.0",
-  "description": "CORS plugin for TheoKit — handles preflight, origin matching, Vary header per W3C spec",
+  "description": "CORS plugin for TheoKit \u2014 handles preflight, origin matching, Vary header per W3C spec",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -31,7 +31,8 @@
     "theokit": "link:../../../theokit/packages/theo"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "keywords": [
     "theokit",
