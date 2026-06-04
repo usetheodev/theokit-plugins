@@ -15,9 +15,8 @@
  *     API docs.
  */
 
-// import type { AuthProvider, AuthResult, OAuthTransaction } from "@theokit/sdk/server/auth"; // restore in T5.2 (SDK 1.6.0 publish)
 import type { IncomingMessage } from "node:http";
-import type { AuthProvider, AuthResult, OAuthTransaction } from "./sdk-shim.js";
+import type { AuthProvider, AuthResult, OAuthTransaction } from "@theokit/sdk/server/auth";
 import type { GitHubProfile, GitHubProviderOptions } from "./types.js";
 
 export type { GitHubProfile, GitHubProviderOptions } from "./types.js";

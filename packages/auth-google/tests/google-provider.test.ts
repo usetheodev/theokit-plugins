@@ -16,7 +16,7 @@ import type { IncomingMessage } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearOidcCache } from "theokit/server/auth";
 import { google } from "../src/index.js";
-import type { OAuthTransaction } from "../src/sdk-shim.js";
+import type { OAuthTransaction } from "@theokit/sdk/server/auth";
 
 const MOCK_BASE = "https://accounts.example-google.test";
 const DISCOVERY_DOC = {

@@ -38,42 +38,26 @@ export type {
   SendMagicLinkFn,
 } from "@theokit/auth-magic-link";
 
-// createSaasAuth — convenience helper. Intentionally untyped against the
-// SDK orchestrator surface to avoid coupling (sdk-shim swap deferred to T5.2).
-// Consumers always have the option to use defineAuth() directly.
+// createSaasAuth — convenience helper. Wraps defineAuth with SAAS-shaped defaults.
 
-import type { AuthProvider } from "./sdk-shim.js";
+import type {
+  AuthOrchestrator,
+  AuthProvider,
+  DefineAuthOptions,
+} from "@theokit/sdk/server/auth";
+import { defineAuth } from "@theokit/sdk/server/auth";
 
-export interface CreateSaasAuthOptions<TSession> {
-  /** Pass the session manager from your createSessionManager() call. */
-  session: unknown;
+export type CreateSaasAuthOptions<TSession> = DefineAuthOptions<TSession> & {
   providers: ReadonlyArray<AuthProvider<unknown, string>>;
-  onSignIn?: (args: { profile: unknown; provider: string }) => Promise<TSession>;
-  onSignOut?: (session: TSession | null) => Promise<void>;
-}
+};
 
 /**
- * Wrapper around `defineAuth` (which is imported lazily at call time so
- * @theokit/plugin-auth can ship before SDK 1.6.0 lands on npm). Consumers
- * SHOULD prefer `defineAuth` directly from `@theokit/sdk/server/auth` —
- * this helper exists for `create-theokit --template saas` boilerplate.
+ * Thin wrapper around `defineAuth`. Used by the `create-theokit --template saas`
+ * boilerplate. Consumers wanting full control SHOULD call `defineAuth` directly
+ * from `@theokit/sdk/server/auth`.
  */
-export async function createSaasAuth<TSession>(opts: CreateSaasAuthOptions<TSession>) {
-  // Lazy dynamic import via computed string so bundlers do NOT statically
-  // try to resolve "@theokit/sdk/server/auth" against the workspace SDK
-  // 1.5.0 (which lacks /server/auth). Once T5.2 lands the SDK 1.6.0
-  // publish + shim drop, this collapses to:
-  //   `import { defineAuth } from "@theokit/sdk/server/auth";`
-  const sdkAuthPath = ["@theokit", "sdk", "server", "auth"].join("/").replace("theokit/sdk", "theokit/sdk");
-  const dynImport = (specifier: string) => import(/* @vite-ignore */ specifier);
-  let sdkAuth: { defineAuth: (o: unknown) => unknown };
-  try {
-    sdkAuth = (await dynImport(sdkAuthPath)) as { defineAuth: (o: unknown) => unknown };
-  } catch {
-    throw new Error(
-      "@theokit/plugin-auth requires @theokit/sdk >= 1.6.0 (server/auth sub-path). " +
-        "Install @theokit/sdk@next or wait for the 1.6.0 GA promote.",
-    );
-  }
-  return sdkAuth.defineAuth(opts) as unknown;
+export function createSaasAuth<TSession>(
+  opts: CreateSaasAuthOptions<TSession>,
+): AuthOrchestrator<TSession> {
+  return defineAuth(opts);
 }

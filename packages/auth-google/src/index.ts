@@ -13,10 +13,9 @@
  *     OIDC mock unblock for Playwright tests). Production builds ignore env.
  */
 
-// import type { AuthProvider, AuthResult, OAuthTransaction } from "@theokit/sdk/server/auth"; // restore in T5.2 (SDK 1.6.0 publish)
 import type { IncomingMessage } from "node:http";
+import type { AuthProvider, AuthResult, OAuthTransaction } from "@theokit/sdk/server/auth";
 import { discoverOidcProvider, pkceChallengeFromVerifier } from "theokit/server/auth";
-import type { AuthProvider, AuthResult, OAuthTransaction } from "./sdk-shim.js";
 import type { GoogleProfile, GoogleProviderOptions } from "./types.js";
 
 export type { GoogleProfile, GoogleProviderOptions } from "./types.js";

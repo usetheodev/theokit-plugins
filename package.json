@@ -40,10 +40,5 @@
   "bugs": {
     "url": "https://github.com/usetheodev/theokit-plugins/issues"
   },
-  "license": "MIT",
-  "pnpm": {
-    "overrides": {
-      "@theokit/sdk": "1.5.0"
-    }
-  }
+  "license": "MIT"
 }

@@ -12,10 +12,9 @@
  *     malformed email throws BEFORE token creation.
  */
 
-// import type { AuthProvider, AuthResult, OAuthTransaction } from "@theokit/sdk/server/auth"; // restore in T5.2
 import { randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
-import type { AuthProvider, AuthResult, OAuthTransaction } from "./sdk-shim.js";
+import type { AuthProvider, AuthResult, OAuthTransaction } from "@theokit/sdk/server/auth";
 import type { MagicLinkProfile, MagicLinkProviderOptions } from "./types.js";
 
 export type {

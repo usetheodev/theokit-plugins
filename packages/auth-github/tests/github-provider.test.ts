@@ -15,7 +15,7 @@
 import type { IncomingMessage } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { github } from "../src/index.js";
-import type { OAuthTransaction } from "../src/sdk-shim.js";
+import type { OAuthTransaction } from "@theokit/sdk/server/auth";
 
 const OPTS = {
   clientId: "Iv1.test_github_client",

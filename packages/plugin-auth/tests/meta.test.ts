@@ -37,14 +37,15 @@ describe("@theokit/plugin-auth — re-export integrity (T7.1)", () => {
     expect(typeof meta.createSaasAuth).toBe("function");
   });
 
-  it("createSaasAuth throws an honest error when SDK lacks /server/auth subpath", async () => {
-    // Linked SDK in this workspace is 1.5.0 (per pnpm.overrides) which lacks
-    // /server/auth — confirms the lazy-load fallback message
-    await expect(
+  it("createSaasAuth throws AuthConfigError when session missing (defineAuth invariant)", () => {
+    // Post-T5.2 (SDK 1.6.0 published): createSaasAuth is a thin synchronous
+    // wrapper over defineAuth. It MUST surface defineAuth's invariants —
+    // in particular missing-session at config time.
+    expect(() =>
       meta.createSaasAuth({
-        session: {},
+        session: undefined as unknown as never,
         providers: [],
       }),
-    ).rejects.toThrow(/server\/auth/i);
+    ).toThrow(/session/i);
   });
 });
