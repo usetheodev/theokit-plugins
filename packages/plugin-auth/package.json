@@ -1,0 +1,52 @@
+{
+  "name": "@theokit/plugin-auth",
+  "version": "0.1.0",
+  "description": "Convenience meta-package for @theokit/sdk auth: bundles @theokit/auth-google + @theokit/auth-github + @theokit/auth-magic-link + createSaasAuth helper.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@theokit/auth-github": "workspace:^",
+    "@theokit/auth-google": "workspace:^",
+    "@theokit/auth-magic-link": "workspace:^"
+  },
+  "peerDependencies": {
+    "@theokit/sdk": ">=1.5.0",
+    "theokit": ">=0.2.4"
+  },
+  "devDependencies": {
+    "@theokit/sdk": "1.5.0",
+    "theokit": "link:../../../theokit/packages/theo",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "theokit",
+    "theokit-plugin",
+    "auth",
+    "saas"
+  ],
+  "author": "@theokit",
+  "license": "MIT"
+}
