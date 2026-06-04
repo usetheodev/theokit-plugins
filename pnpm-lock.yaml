@@ -45,6 +45,24 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(happy-dom@20.9.0)(jsdom@25.0.1)
 
+  packages/auth-github:
+    devDependencies:
+      '@theokit/sdk':
+        specifier: 1.5.0
+        version: 1.5.0(zod@4.4.3)
+      theokit:
+        specifier: link:../../../theokit/packages/theo
+        version: link:../../../theokit/packages/theo
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(happy-dom@20.9.0)(jsdom@25.0.1)
+
   packages/auth-google:
     devDependencies:
       '@theokit/sdk':
