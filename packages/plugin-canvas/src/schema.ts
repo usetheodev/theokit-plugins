@@ -46,6 +46,7 @@
 import { z } from 'zod'
 
 import { CanvasArtifactSecurityError, CanvasArtifactValidationError } from './errors.js'
+import { sanitizeHtmlSrcdoc, sanitizeSvg } from './ui/renderers/sanitize.js'
 
 // ───── Envelope ─────
 
@@ -263,13 +264,14 @@ export function isArtifact(input: unknown): input is Artifact {
  */
 export function enforceArtifactSecurity(artifact: Artifact): void {
   if (artifact.kind === 'svg') {
-    if (/<script\b/i.test(artifact.content)) {
+    const { report } = sanitizeSvg(artifact.content)
+    if (report.removedScript) {
       throw new CanvasArtifactSecurityError(
         'SVG contains <script>. Strip it client-side before publishing.',
         'svg-script-tag',
       )
     }
-    if (/\sxlink:href\s*=\s*['"]\s*javascript:/i.test(artifact.content)) {
+    if (report.removedJsUrl) {
       throw new CanvasArtifactSecurityError(
         'SVG contains a javascript: xlink:href. Strip it client-side before publishing.',
         'svg-javascript-href',
@@ -277,7 +279,10 @@ export function enforceArtifactSecurity(artifact: Artifact): void {
     }
   }
   if (artifact.kind === 'html') {
-    if (/<meta\s+http-equiv\s*=\s*['"]refresh/i.test(artifact.srcdoc)) {
+    const { report } = sanitizeHtmlSrcdoc(artifact.srcdoc)
+    // sanitizeHtmlSrcdoc sets removedScript=true when a meta-refresh is stripped
+    // (meta-refresh is a navigation attack, categorized under the script removal signal)
+    if (report.removedScript) {
       throw new CanvasArtifactSecurityError(
         'HTML srcdoc contains a meta refresh. Strip it before publishing.',
         'html-meta-refresh',
