@@ -63,6 +63,7 @@ interface CopilotRegistration {
  */
 export class CopilotRuntime {
   private readonly registry = new Map<string, CopilotRegistration>();
+  private readonly queues = new Map<string, Promise<void>>();
   private readonly evaluator = new TriggerEvaluator();
   private readonly roundRobinCursor = new Map<string, number>();
   private readonly provider: CopilotRealtimeProvider;
@@ -147,7 +148,7 @@ export class CopilotRuntime {
     }
   }
 
-  /** Deactivate a copilot — leaves room but keeps registration. */
+  /** Deactivate a copilot — drains pending work, then leaves room but keeps registration. */
   async deactivate(copilotId: string): Promise<void> {
     const reg = this.registry.get(copilotId);
     if (reg === undefined) return;
@@ -155,6 +156,9 @@ export class CopilotRuntime {
     reg.unsubscribeRoom = undefined as unknown as () => void;
     reg.unscheduleIdle?.();
     reg.unscheduleIdle = undefined as unknown as () => void;
+    // Drain pending handleFrame work before teardown (EC-3).
+    await this.queues.get(copilotId);
+    this.queues.delete(copilotId);
     await reg.member.leave();
   }
 
@@ -176,6 +180,14 @@ export class CopilotRuntime {
   }
 
   private async handleFrame(reg: CopilotRegistration, frame: CopilotFrame): Promise<void> {
+    const id = reg.descriptor.id;
+    const prev = this.queues.get(id) ?? Promise.resolve();
+    const next = prev.then(() => this._handleFrame(reg, frame)).catch(() => {});
+    this.queues.set(id, next);
+    return next;
+  }
+
+  private async _handleFrame(reg: CopilotRegistration, frame: CopilotFrame): Promise<void> {
     const matches = this.evaluator.evaluate(
       reg.descriptor.triggers,
       frame,
@@ -216,6 +228,12 @@ export class CopilotRuntime {
 
     let finalText = "";
     try {
+      // Resolve apiKey thunk (supports lazy / rotated keys).
+      const resolvedApiKey =
+        typeof reg.descriptor.agent.apiKey === "function"
+          ? reg.descriptor.agent.apiKey()
+          : reg.descriptor.agent.apiKey;
+
       // Minimal Zod-like passthrough schema (Agent.streamObject expects a schema).
       const passthrough = {
         safeParse: (v: unknown) => ({ success: true, data: v }),
@@ -225,7 +243,7 @@ export class CopilotRuntime {
         schema: passthrough,
         prompt: promptText,
         model: reg.descriptor.agent.model,
-        ...(reg.descriptor.agent.apiKey !== undefined ? { apiKey: reg.descriptor.agent.apiKey } : {}),
+        ...(resolvedApiKey !== undefined ? { apiKey: resolvedApiKey } : {}),
         ...(reg.descriptor.agent.local !== undefined ? { local: reg.descriptor.agent.local } : {}),
         ...(reg.descriptor.agent.systemPrompt !== undefined
           ? { systemPrompt: reg.descriptor.agent.systemPrompt }
@@ -249,6 +267,7 @@ export class CopilotRuntime {
       await reg.member.broadcastEvent("agent-error", {
         message: cause instanceof Error ? cause.message : String(cause),
       });
+      throw cause;
     } finally {
       await reg.member.setTyping(false);
     }

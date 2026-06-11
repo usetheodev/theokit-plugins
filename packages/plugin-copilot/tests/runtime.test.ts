@@ -268,4 +268,71 @@ describe("CopilotRuntime", () => {
     const rt = new CopilotRuntime({ provider: makeMemoryProvider(), agent: makeAgent() });
     await expect(rt.activate("nope")).rejects.toThrow(/Unknown copilot/);
   });
+
+  it("broadcast payload does not contain api key value", async () => {
+    const provider = makeMemoryProvider();
+    const secretKey = "sk-secret-12345-do-not-leak";
+    const copilotWithKey = defineCopilot({
+      ...baseCopilot,
+      id: "key-test",
+      agent: { name: "GPT", model: "openrouter/openai/gpt-4o-mini", apiKey: secretKey },
+    });
+    const rt = new CopilotRuntime({
+      provider,
+      agent: makeAgent("response-text"),
+      copilots: [copilotWithKey],
+    });
+    await rt.activate("key-test");
+
+    provider.emit("room-1", {
+      type: "broadcast",
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "hi" },
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    for (const b of provider.broadcasts) {
+      const serialized = JSON.stringify(b);
+      expect(serialized).not.toContain(secretKey);
+    }
+  });
+
+  it("api key thunk is resolved before agent call", async () => {
+    const provider = makeMemoryProvider();
+    const thunkKey = "thunk-resolved-key";
+    const apiKeyFn = vi.fn(() => thunkKey);
+
+    let capturedOpts: Record<string, unknown> | undefined;
+    const spyAgent: CopilotAgentLike = {
+      async *streamObject<T>(opts: Record<string, unknown>) {
+        capturedOpts = opts;
+        yield { type: "partial" as const, partial: { text: "ok" } as unknown as T, attempt: 0 };
+        yield { type: "complete" as const, object: { text: "ok" } as unknown as T };
+      },
+    };
+
+    const copilotWithThunk = defineCopilot({
+      ...baseCopilot,
+      id: "thunk-test",
+      agent: { name: "GPT", model: "openrouter/openai/gpt-4o-mini", apiKey: apiKeyFn },
+    });
+    const rt = new CopilotRuntime({
+      provider,
+      agent: spyAgent,
+      copilots: [copilotWithThunk],
+    });
+    await rt.activate("thunk-test");
+
+    provider.emit("room-1", {
+      type: "broadcast",
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "hi" },
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(apiKeyFn).toHaveBeenCalled();
+    expect(capturedOpts?.apiKey).toBe(thunkKey);
+  });
 });

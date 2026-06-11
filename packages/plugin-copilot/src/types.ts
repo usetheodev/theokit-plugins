@@ -38,8 +38,8 @@ export interface CopilotAgentConfig {
   readonly name: string;
   /** Model id (e.g. "openrouter/openai/gpt-4o-mini"). */
   readonly model: string | { readonly id: string };
-  /** API key (or undefined to use env). */
-  readonly apiKey?: string;
+  /** API key (or undefined to use env). Accepts a thunk for lazy/rotated keys. */
+  readonly apiKey?: string | (() => string);
   /** Optional system prompt. */
   readonly systemPrompt?: string;
   /** Pass-through local options (sdk LocalOptions). */
