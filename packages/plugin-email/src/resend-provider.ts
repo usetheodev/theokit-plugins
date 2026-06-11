@@ -79,7 +79,7 @@ export function ResendProvider(opts: ResendProviderOptions): EmailProvider {
       if (result.error || !result.data) {
         throw new EmailSendError(
           `Resend send returned error: ${result.error?.message ?? "unknown"}`,
-          { provider: "resend", raw: result.error },
+          { provider: "resend", raw: result.error, cause: result.error },
         );
       }
       return { id: result.data.id, provider: "resend", raw: result };
