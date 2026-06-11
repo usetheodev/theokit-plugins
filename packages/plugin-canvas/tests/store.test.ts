@@ -203,4 +203,28 @@ describe('createSqliteArtifactStore — table name validation', () => {
       }),
     ).not.toThrow()
   })
+
+  it('F7: boundary — 63-char name accepted, 64-char name rejected', () => {
+    // 63 chars: 1 leading letter + 62 underscores = exactly at the limit
+    const name63 = 'a' + '_'.repeat(62)
+    expect(name63).toHaveLength(63)
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: name63,
+        autoMigrate: false,
+      }),
+    ).not.toThrow()
+
+    // 64 chars: exceeds the regex ^[a-zA-Z_][a-zA-Z0-9_]{0,62}$
+    const name64 = 'a' + '_'.repeat(63)
+    expect(name64).toHaveLength(64)
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: name64,
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
+  })
 })

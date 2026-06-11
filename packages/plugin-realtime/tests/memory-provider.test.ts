@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createMemoryRealtimeProvider } from "../src/memory-provider.js";
 import type { RealtimeFrame } from "../src/types.js";
 
@@ -64,5 +64,43 @@ describe("MemoryRealtimeProvider", () => {
     await p.joinRoom("room", { connectionId: "c1" });
     await expect(p.leaveRoom("room", "unknown")).resolves.toBeUndefined();
     expect(await p.getPresence("room")).toEqual({ c1: {} });
+  });
+
+  it("T3.2: listener error is logged, other listeners still run", async () => {
+    const p = createMemoryRealtimeProvider();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const listener1Results: string[] = [];
+    const listener2Results: string[] = [];
+    const listener3Results: string[] = [];
+
+    // First listener throws
+    p.subscribeRoom("room", () => {
+      listener1Results.push("called");
+      throw new Error("listener-1-boom");
+    });
+    // Second and third are well-behaved
+    p.subscribeRoom("room", () => {
+      listener2Results.push("called");
+    });
+    p.subscribeRoom("room", () => {
+      listener3Results.push("called");
+    });
+
+    // Trigger a frame by joining
+    await p.joinRoom("room", { connectionId: "c1" }, { x: 1 });
+
+    // All 3 listeners were called despite listener 1 throwing
+    expect(listener1Results).toEqual(["called"]);
+    expect(listener2Results).toEqual(["called"]);
+    expect(listener3Results).toEqual(["called"]);
+
+    // Error was logged
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("listener error"),
+      expect.objectContaining({ error: expect.any(Error) }),
+    );
+
+    consoleSpy.mockRestore();
   });
 });

@@ -298,6 +298,97 @@ describe("CopilotRuntime", () => {
     }
   });
 
+  it("T2.1: concurrent handleFrame calls are serialized", async () => {
+    const provider = makeMemoryProvider();
+    const order: number[] = [];
+    let callCount = 0;
+
+    // Agent that records invocation order and introduces a small delay
+    const orderAgent: CopilotAgentLike = {
+      async *streamObject<T>() {
+        const n = ++callCount;
+        order.push(n);
+        // Small delay to prove serialization (concurrent calls would interleave)
+        await new Promise((r) => setTimeout(r, 10));
+        yield { type: "partial" as const, partial: { text: `r${n}` } as unknown as T, attempt: 0 };
+        yield { type: "complete" as const, object: { text: `r${n}` } as unknown as T };
+      },
+    };
+
+    const rt = new CopilotRuntime({
+      provider,
+      agent: orderAgent,
+      copilots: [baseCopilot],
+    });
+    await rt.activate("c1");
+
+    // Fire 3 frames concurrently
+    const frame = {
+      type: "broadcast" as const,
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "go" },
+    };
+    provider.emit("room-1", frame);
+    provider.emit("room-1", frame);
+    provider.emit("room-1", frame);
+
+    // Wait for all to complete
+    await new Promise((r) => setTimeout(r, 150));
+
+    expect(order).toEqual([1, 2, 3]);
+  });
+
+  it("T2.1: deactivate drains pending queue", async () => {
+    const provider = makeMemoryProvider();
+    const callOrder: string[] = [];
+
+    const slowAgent: CopilotAgentLike = {
+      async *streamObject<T>() {
+        callOrder.push("agent-start");
+        await new Promise((r) => setTimeout(r, 20));
+        callOrder.push("agent-end");
+        yield { type: "complete" as const, object: { text: "done" } as unknown as T };
+      },
+    };
+
+    const rt = new CopilotRuntime({
+      provider,
+      agent: slowAgent,
+      copilots: [baseCopilot],
+    });
+    await rt.activate("c1");
+
+    // Fire a frame then immediately deactivate
+    provider.emit("room-1", {
+      type: "broadcast",
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "go" },
+    });
+
+    await rt.deactivate("c1");
+    callOrder.push("deactivate-done");
+
+    // Agent must have completed before deactivate resolved
+    expect(callOrder.indexOf("agent-end")).toBeLessThan(
+      callOrder.indexOf("deactivate-done"),
+    );
+  });
+
+  it("T2.1: deactivate with empty queue resolves immediately", async () => {
+    const provider = makeMemoryProvider();
+    const rt = new CopilotRuntime({
+      provider,
+      agent: makeAgent(),
+      copilots: [baseCopilot],
+    });
+    await rt.activate("c1");
+
+    // Deactivate with no pending frames — should not hang or throw
+    await expect(rt.deactivate("c1")).resolves.toBeUndefined();
+  });
+
   it("api key thunk is resolved before agent call", async () => {
     const provider = makeMemoryProvider();
     const thunkKey = "thunk-resolved-key";

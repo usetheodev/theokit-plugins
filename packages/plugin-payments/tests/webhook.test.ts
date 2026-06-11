@@ -3,7 +3,7 @@
  *
  * Per plan p6-plugin-payments v1.0 § Phase 2 / T2.1 + T2.2.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type Stripe from "stripe";
 
 import {
@@ -110,6 +110,86 @@ describe("defineStripeWebhook + WebhookRegistry (P#6 T2.1)", () => {
       defineStripeWebhook("checkout.session.completed", async () => {}),
     );
     expect(registry.hasHandlersFor("checkout.session.completed")).toBe(true);
+  });
+
+  it("T3.5: dispatch runs all handlers even if first throws", async () => {
+    const registry = new WebhookRegistry();
+    const handler1 = vi.fn(async () => {});
+    const handler2 = vi.fn(async () => {
+      throw new Error("handler-2-fail");
+    });
+    const handler3 = vi.fn(async () => {});
+
+    registry.register(defineStripeWebhook("checkout.session.completed", handler1));
+    registry.register(defineStripeWebhook("checkout.session.completed", handler2));
+    registry.register(defineStripeWebhook("checkout.session.completed", handler3));
+
+    await expect(
+      registry.dispatch(fakeEvent("checkout.session.completed")),
+    ).rejects.toThrow();
+
+    // All 3 handlers called despite handler2 throwing
+    expect(handler1).toHaveBeenCalledOnce();
+    expect(handler2).toHaveBeenCalledOnce();
+    expect(handler3).toHaveBeenCalledOnce();
+  });
+
+  it("T3.5: dispatch throws first error (LIFO order), not AggregateError", async () => {
+    const registry = new WebhookRegistry();
+    // First registered = runs last in LIFO
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler-1-fail");
+      }),
+    );
+    // Second registered = runs first in LIFO
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler-2-fail");
+      }),
+    );
+
+    const thrown = await registry
+      .dispatch(fakeEvent("checkout.session.completed"))
+      .catch((e: unknown) => e);
+
+    // LIFO: handler-2 runs first, so its error is the "first error" thrown
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe("handler-2-fail");
+    // Not an AggregateError
+    expect(thrown).not.toBeInstanceOf(AggregateError);
+  });
+
+  it("T3.5: dispatch logs subsequent handler errors", async () => {
+    const registry = new WebhookRegistry();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // First registered = runs last in LIFO (subsequent error, logged)
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler-1-fail");
+      }),
+    );
+    // Second registered = runs first in LIFO (first error, re-thrown)
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler-2-fail");
+      }),
+    );
+
+    await registry
+      .dispatch(fakeEvent("checkout.session.completed"))
+      .catch(() => {});
+
+    // The subsequent handler's error (handler-1) should be logged
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("subsequent handler error"),
+      expect.objectContaining({
+        error: expect.any(Error),
+      }),
+    );
+
+    consoleSpy.mockRestore();
   });
 });
 

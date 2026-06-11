@@ -184,4 +184,40 @@ describe('createArtifactRouteHandlers', () => {
     })
     expect(res.status).toBe(404)
   })
+
+  it('T1.4: 500 error does not leak internal message', async () => {
+    const store = createInMemoryArtifactStore()
+    // Override list to throw an internal error
+    store.list = () => {
+      throw new Error('SQLITE_ERROR: no such table')
+    }
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.list(
+      new Request('http://x/artifacts', { method: 'GET' }),
+    )
+    expect(res.status).toBe(500)
+    const text = await res.text()
+    expect(text).toContain('Internal Server Error')
+    expect(text).not.toContain('SQLITE_ERROR')
+  })
+
+  it('T3.1: onAfterInsert error is logged but response is still 201', async () => {
+    const store = createInMemoryArtifactStore()
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const handlers = createArtifactRouteHandlers({
+      store,
+      onAfterInsert: () => {
+        throw new Error('side-effect boom')
+      },
+    })
+    const res = await handlers.create(jsonRequest('POST', 'http://x/artifacts', md()))
+    expect(res.status).toBe(201)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('onAfterInsert'),
+      expect.objectContaining({
+        error: expect.any(Error),
+      }),
+    )
+    consoleSpy.mockRestore()
+  })
 })
