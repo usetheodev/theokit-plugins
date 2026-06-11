@@ -51,9 +51,11 @@ export function createMemoryRealtimeProvider(): RealtimeProvider {
     for (const listener of state.listeners) {
       try {
         listener(frame);
-      } catch {
-        // Listener errors must not break the broadcast loop. Consumer code
-        // is expected to handle its own errors; we never rethrow here.
+      } catch (listenerErr) {
+        console.error('[plugin-realtime] listener error in fanout:', {
+          event: frame.type ?? 'unknown',
+          error: listenerErr,
+        })
       }
     }
   };

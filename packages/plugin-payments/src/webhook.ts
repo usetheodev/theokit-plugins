@@ -89,10 +89,28 @@ export class WebhookRegistry {
     const bucket = this.handlers.get(event.type);
     if (!bucket || bucket.length === 0) return;
     // LIFO: most-recently-registered handler runs first.
+    // All handlers run even if one throws; first error is re-thrown after
+    // the loop so the caller's error contract (single Error) is preserved.
+    let firstError: unknown;
     for (let i = bucket.length - 1; i >= 0; i--) {
       const handler = bucket[i];
       if (!handler) continue;
-      await handler.handle(event);
+      try {
+        await handler.handle(event);
+      } catch (err) {
+        if (firstError === undefined) {
+          firstError = err;
+        } else {
+          console.error('[plugin-payments] subsequent handler error in dispatch:', {
+            eventType: event.type,
+            eventId: event.id,
+            error: err,
+          });
+        }
+      }
+    }
+    if (firstError !== undefined) {
+      throw firstError;
     }
   }
 
