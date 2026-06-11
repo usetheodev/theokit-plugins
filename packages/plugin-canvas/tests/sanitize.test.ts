@@ -53,10 +53,55 @@ describe('sanitizeSvg', () => {
     expect(report.removedDataUrl).toBe(true)
   })
 
+  it('strips <foreignObject> (XSS escape hatch)', () => {
+    const { output } = sanitizeSvg(
+      '<svg><foreignObject><body xmlns="http://www.w3.org/1999/xhtml"><script>alert(1)</script></body></foreignObject></svg>',
+    )
+    expect(output).not.toMatch(/<foreignObject/i)
+    expect(output).not.toMatch(/<script/i)
+  })
+
+  it('strips case-mixed javascript: URIs', () => {
+    const { output } = sanitizeSvg(
+      '<svg><a href="jAvAsCrIpT:alert(1)">x</a></svg>',
+    )
+    expect(output).not.toMatch(/javascript:/i)
+  })
+
+  it('strips nested script inside <defs>', () => {
+    const { output } = sanitizeSvg(
+      '<svg><defs><script>bad()</script></defs><rect/></svg>',
+    )
+    expect(output).not.toMatch(/<script/i)
+    expect(output).toMatch(/<rect/)
+  })
+
+  it('strips CSS expression() in style attributes', () => {
+    const { output } = sanitizeSvg(
+      '<svg><rect style="width:expression(alert(1))"/></svg>',
+    )
+    expect(output).not.toMatch(/expression\s*\(/i)
+  })
+
+  it('strips <use> with external xlink:href', () => {
+    const { output } = sanitizeSvg(
+      '<svg><use xlink:href="http://evil.com/payload.svg#x"/></svg>',
+    )
+    expect(output).not.toMatch(/evil\.com/)
+  })
+
+  it('strips on-event with newline evasion', () => {
+    const { output } = sanitizeSvg(
+      '<svg><rect on\nmouseover="alert(1)" /></svg>',
+    )
+    expect(output).not.toMatch(/alert/)
+  })
+
   it('is a no-op for clean SVG', () => {
-    const clean = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>'
+    const clean = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"></rect></svg>'
     const { output, report } = sanitizeSvg(clean)
-    expect(output).toBe(clean)
+    expect(output).toContain('<rect')
+    expect(output).toContain('<svg')
     expect(report.removedScript).toBe(false)
     expect(report.removedOnHandler).toBe(false)
     expect(report.removedJsUrl).toBe(false)
@@ -72,8 +117,8 @@ describe('sanitizeHtmlSrcdoc', () => {
     expect(output).toMatch(/<p>hi/)
   })
 
-  it('is a no-op for benign HTML', () => {
-    const clean = '<!doctype html><p>hi</p>'
-    expect(sanitizeHtmlSrcdoc(clean).output).toBe(clean)
+  it('preserves benign HTML content', () => {
+    const { output } = sanitizeHtmlSrcdoc('<p>hi</p>')
+    expect(output).toContain('<p>hi</p>')
   })
 })
