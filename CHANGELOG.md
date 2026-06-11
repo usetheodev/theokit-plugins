@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-11
+
 ### Added
 
 - Code review report covering all 11 packages — 166 findings across 182 files (`code-review-output/REVIEW-REPORT.md`)
@@ -13,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - DOMPurify-based SVG/HTML sanitization in plugin-canvas, replacing regex-based approach (OWASP recommendation)
 - Resend provider test suite (`packages/plugin-email/tests/resend-provider.test.ts`)
 - Budget bridge calendar-month test suite (`packages/plugin-copilot/tests/budget-bridge.test.ts`)
+- Initial monorepo scaffold — `pnpm-workspace.yaml` + `tsconfig.base.json` + ESLint + Prettier + Changesets + CI workflows
 
 ### Changed
 
@@ -39,7 +42,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - plugin-payments: webhook handler errors no longer block subsequent handlers
 - plugin-realtime: listener errors in fanout loops now logged instead of silently swallowed
 - plugin-realtime: mermaid and Yjs lazy loaders use single-flight pattern (no concurrent double-init, no permanent error cache)
-
-### Added (scaffold, 2026-05-27)
-
-- Initial monorepo scaffold — `pnpm-workspace.yaml` + `tsconfig.base.json` + ESLint + Prettier + Changesets + CI workflows. Empty `packages/` directory per ADR-0008 + R0.6.5 ("bottom-up — needs community demand signal first"). First plugin lands when it clears the gates documented in [README.md](./README.md).
