@@ -51,7 +51,7 @@ export class BudgetBridge {
       s.dailyUsedUsd = 0;
       s.dayStartMs = this.startOfDay(now);
     }
-    if (now >= s.monthStartMs + 30 * 86_400_000) {
+    if (now >= this.startOfNextMonth(s.monthStartMs)) {
       s.monthlyUsedUsd = 0;
       s.monthStartMs = this.startOfMonth(now);
     }
@@ -101,6 +101,13 @@ export class BudgetBridge {
   getUsage(copilotId: string, roomId: string): { dailyUsedUsd: number; monthlyUsedUsd: number } {
     const s = this.getOrInitState(this.getKey(copilotId, roomId));
     return { dailyUsedUsd: s.dailyUsedUsd, monthlyUsedUsd: s.monthlyUsedUsd };
+  }
+
+  private startOfNextMonth(ms: number): number {
+    const d = new Date(ms);
+    d.setUTCMonth(d.getUTCMonth() + 1, 1);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.getTime();
   }
 
   private startOfDay(nowMs: number): number {
