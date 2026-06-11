@@ -98,8 +98,8 @@ Hooks available:
 | `useRoom<P, E>()` | `{roomId, others, myPresence, connectionId, updateMyPresence, broadcast}` | Throws outside `<RoomProvider>` |
 | `useOthers<P>()` | `Record<connectionId, P>` | Read-only snapshot of other clients' presence |
 | `usePresence<P>()` | `P` | Local client's current presence |
-| `useUpdateMyPresence<P>()` | `(patch: Partial<P>) => void` | Optimistic local merge |
-| `useBroadcast<E>()` | `(event: string, payload: E) => void` | Fire-and-forget event fanout |
+| `useUpdateMyPresence<P>()` | `(patch: Partial<P>) => void` | **Local-only in v0.1** — updates local state optimistically but does not sync to the server yet |
+| `useBroadcast<E>()` | `(event: string, payload: E) => void` | **Local-only in v0.1** — events are scoped to the current client and do not fan out to other participants yet |
 | `useYDoc()` | `Y.Doc` | Throws in v0.1 — Y.Doc auto-wiring deferred to v0.x |
 
 ## Yjs CRDT provider (opt-in)
