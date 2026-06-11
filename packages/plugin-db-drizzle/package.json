@@ -1,0 +1,62 @@
+{
+  "name": "@theokit/plugin-db-drizzle",
+  "version": "0.1.0",
+  "description": "Standalone DB plugin for TheoKit — wraps drizzle-kit + @theokit/orm with a plugin-shape factory, 7-verb theokit db CLI, drizzle-kit studio passthrough, and optional devtools tab integration. Form 4 Hybrid per plan p5-plugin-db-drizzle v1.0.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@theokit/orm": ">=0.1.0-next.1",
+    "drizzle-orm": ">=0.36.0",
+    "reflect-metadata": "^0.2.0",
+    "theokit": ">=0.2.3"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-kit": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@theokit/orm": "^0.1.0-next.1",
+    "@types/node": "^22.0.0",
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "^0.36.4",
+    "reflect-metadata": "^0.2.0",
+    "theokit": "link:../../../theokit/packages/theo",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.8"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "keywords": [
+    "theokit",
+    "theokit-plugin",
+    "drizzle",
+    "drizzle-orm",
+    "drizzle-kit",
+    "database",
+    "orm",
+    "migrations"
+  ],
+  "author": "@theokit",
+  "license": "MIT"
+}

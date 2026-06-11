@@ -1,7 +1,7 @@
 {
   "name": "@theokit/plugin-voice",
   "version": "0.7.0",
-  "description": "Voice plugin for TheoKit — STT + TTS bridge with browser MediaRecorder helper + UI components.",
+  "description": "Voice plugin for TheoKit \u2014 STT + TTS bridge with browser MediaRecorder helper + UI components.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -49,10 +49,12 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "theokit": "link:../../../theokit/packages/theo",
-    "vitest": "^2.1.0"
+    "vite": "^7.3.5",
+    "vitest": "^4.1.8"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "keywords": [
     "theokit",

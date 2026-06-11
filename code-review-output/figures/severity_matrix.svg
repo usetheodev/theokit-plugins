@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 320" font-family="sans-serif" font-size="12">
+  <style>
+    .header { font-weight: bold; fill: #fff; font-size: 11px; }
+    .cell { font-size: 12px; text-anchor: middle; dominant-baseline: central; }
+    .label { font-size: 11px; text-anchor: end; dominant-baseline: central; }
+    .title { font-size: 14px; font-weight: bold; text-anchor: middle; }
+  </style>
+
+  <text x="350" y="18" class="title">Findings: Severity x Category</text>
+
+  <!-- Column headers -->
+  <g transform="translate(120,30)">
+    <rect x="0" y="0" width="70" height="22" rx="3" fill="#6b7280"/>
+    <text x="35" y="11" class="header cell">complex.</text>
+    <rect x="75" y="0" width="70" height="22" rx="3" fill="#6b7280"/>
+    <text x="110" y="11" class="header cell">security</text>
+    <rect x="150" y="0" width="70" height="22" rx="3" fill="#6b7280"/>
+    <text x="185" y="11" class="header cell">concurr.</text>
+    <rect x="225" y="0" width="70" height="22" rx="3" fill="#6b7280"/>
+    <text x="260" y="11" class="header cell">err_hand.</text>
+    <rect x="300" y="0" width="70" height="22" rx="3" fill="#6b7280"/>
+    <text x="335" y="11" class="header cell">contract</text>
+    <rect x="375" y="0" width="70" height="22" rx="3" fill="#6b7280"/>
+    <text x="410" y="11" class="header cell">complete.</text>
+    <rect x="450" y="0" width="70" height="22" rx="3" fill="#6b7280"/>
+    <text x="485" y="11" class="header cell">test</text>
+    <rect x="525" y="0" width="60" height="22" rx="3" fill="#6b7280"/>
+    <text x="555" y="11" class="header cell">other</text>
+  </g>
+
+  <!-- Row: Critical -->
+  <g transform="translate(0,62)">
+    <text x="115" y="18" class="label" fill="#dc2626" font-weight="bold">CRITICAL</text>
+    <rect x="120" y="4" width="70" height="28" rx="3" fill="#fecaca"/>
+    <text x="155" y="18" class="cell" fill="#991b1b">26</text>
+    <rect x="195" y="4" width="70" height="28" rx="3" fill="#fecaca"/>
+    <text x="230" y="18" class="cell" fill="#991b1b">1</text>
+    <rect x="270" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="305" y="18" class="cell">0</text>
+    <rect x="345" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="380" y="18" class="cell">0</text>
+    <rect x="420" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="455" y="18" class="cell">0</text>
+    <rect x="495" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="530" y="18" class="cell">0</text>
+    <rect x="570" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="605" y="18" class="cell">0</text>
+    <rect x="645" y="4" width="60" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="675" y="18" class="cell">0</text>
+  </g>
+
+  <!-- Row: High -->
+  <g transform="translate(0,98)">
+    <text x="115" y="18" class="label" fill="#ea580c" font-weight="bold">HIGH</text>
+    <rect x="120" y="4" width="70" height="28" rx="3" fill="#fed7aa"/>
+    <text x="155" y="18" class="cell" fill="#9a3412">36</text>
+    <rect x="195" y="4" width="70" height="28" rx="3" fill="#fed7aa"/>
+    <text x="230" y="18" class="cell" fill="#9a3412">2</text>
+    <rect x="270" y="4" width="70" height="28" rx="3" fill="#fed7aa"/>
+    <text x="305" y="18" class="cell" fill="#9a3412">1</text>
+    <rect x="345" y="4" width="70" height="28" rx="3" fill="#fed7aa"/>
+    <text x="380" y="18" class="cell" fill="#9a3412">1</text>
+    <rect x="420" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="455" y="18" class="cell">0</text>
+    <rect x="495" y="4" width="70" height="28" rx="3" fill="#fed7aa"/>
+    <text x="530" y="18" class="cell" fill="#9a3412">1</text>
+    <rect x="570" y="4" width="70" height="28" rx="3" fill="#fed7aa"/>
+    <text x="605" y="18" class="cell" fill="#9a3412">3</text>
+    <rect x="645" y="4" width="60" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="675" y="18" class="cell">0</text>
+  </g>
+
+  <!-- Row: Medium -->
+  <g transform="translate(0,134)">
+    <text x="115" y="18" class="label" fill="#ca8a04" font-weight="bold">MEDIUM</text>
+    <rect x="120" y="4" width="70" height="28" rx="3" fill="#fef9c3"/>
+    <text x="155" y="18" class="cell" fill="#854d0e">11</text>
+    <rect x="195" y="4" width="70" height="28" rx="3" fill="#fef9c3"/>
+    <text x="230" y="18" class="cell" fill="#854d0e">3</text>
+    <rect x="270" y="4" width="70" height="28" rx="3" fill="#fef9c3"/>
+    <text x="305" y="18" class="cell" fill="#854d0e">2</text>
+    <rect x="345" y="4" width="70" height="28" rx="3" fill="#fef9c3"/>
+    <text x="380" y="18" class="cell" fill="#854d0e">4</text>
+    <rect x="420" y="4" width="70" height="28" rx="3" fill="#fef9c3"/>
+    <text x="455" y="18" class="cell" fill="#854d0e">5</text>
+    <rect x="495" y="4" width="70" height="28" rx="3" fill="#fef9c3"/>
+    <text x="530" y="18" class="cell" fill="#854d0e">3</text>
+    <rect x="570" y="4" width="70" height="28" rx="3" fill="#fef9c3"/>
+    <text x="605" y="18" class="cell" fill="#854d0e">3</text>
+    <rect x="645" y="4" width="60" height="28" rx="3" fill="#fef9c3"/>
+    <text x="675" y="18" class="cell" fill="#854d0e">3</text>
+  </g>
+
+  <!-- Row: Low -->
+  <g transform="translate(0,170)">
+    <text x="115" y="18" class="label" fill="#65a30d">LOW</text>
+    <rect x="120" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="155" y="18" class="cell">0</text>
+    <rect x="195" y="4" width="70" height="28" rx="3" fill="#dcfce7"/>
+    <text x="230" y="18" class="cell">1</text>
+    <rect x="270" y="4" width="70" height="28" rx="3" fill="#dcfce7"/>
+    <text x="305" y="18" class="cell">1</text>
+    <rect x="345" y="4" width="70" height="28" rx="3" fill="#dcfce7"/>
+    <text x="380" y="18" class="cell">1</text>
+    <rect x="420" y="4" width="70" height="28" rx="3" fill="#dcfce7"/>
+    <text x="455" y="18" class="cell">4</text>
+    <rect x="495" y="4" width="70" height="28" rx="3" fill="#dcfce7"/>
+    <text x="530" y="18" class="cell">1</text>
+    <rect x="570" y="4" width="70" height="28" rx="3" fill="#dcfce7"/>
+    <text x="605" y="18" class="cell">5</text>
+    <rect x="645" y="4" width="60" height="28" rx="3" fill="#dcfce7"/>
+    <text x="675" y="18" class="cell">21</text>
+  </g>
+
+  <!-- Row: Info -->
+  <g transform="translate(0,206)">
+    <text x="115" y="18" class="label" fill="#9ca3af">INFO</text>
+    <rect x="120" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="155" y="18" class="cell">19</text>
+    <rect x="195" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="230" y="18" class="cell">0</text>
+    <rect x="270" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="305" y="18" class="cell">0</text>
+    <rect x="345" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="380" y="18" class="cell">0</text>
+    <rect x="420" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="455" y="18" class="cell">0</text>
+    <rect x="495" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="530" y="18" class="cell">7</text>
+    <rect x="570" y="4" width="70" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="605" y="18" class="cell">0</text>
+    <rect x="645" y="4" width="60" height="28" rx="3" fill="#f3f4f6"/>
+    <text x="675" y="18" class="cell">1</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(120,254)">
+    <text x="0" y="0" font-size="10" fill="#6b7280">Severity source: consensus = McCabe/OWASP thresholds (tool-measured) | default = SonarQube/ruff defaults | heuristic = naming/style guidance</text>
+    <text x="0" y="16" font-size="10" fill="#6b7280">"other" column aggregates: maturity, design_pattern, code, magic_number categories</text>
+  </g>
+</svg>

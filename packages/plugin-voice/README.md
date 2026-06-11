@@ -2,11 +2,11 @@
 
 Voice (Speech-to-Text + Text-to-Speech) plugin for [TheoKit](https://github.com/usetheodev/theokit).
 
-> **Status:** 0.1.0 — scaffold only. STT handler ships in 0.2.0 (T3.2), TTS in 0.3.0 (T3.3), UI components in 0.4.0 (T3.4). See [theokit-ui-parity-plan.md](https://github.com/usetheodev/theokit-tools/blob/main/.claude/knowledge-base/plans/theokit-ui-parity-plan.md) Phase 3.
+> **Status:** 0.7.0 — STT handler, TTS handler, and UI components (`VoiceRecorderBar`, `TalkOptions`, `Alert`, `useTts`) are shipped. See [theokit-ui-parity-plan.md](https://github.com/usetheodev/theokit-tools/blob/main/.claude/knowledge-base/plans/theokit-ui-parity-plan.md) Phase 3.
 
 ## Why this plugin
 
-- Same single-config pattern as [`@theokit/plugin-cors`](../plugin-cors/) — install it, register it once in `theo.config.ts`, get `/api/voice/stt` + `/api/voice/tts` HTTP endpoints automatically. Zero extra files in `server/routes/`.
+- Same single-config pattern as [`@theokit/plugin-cors`](../plugin-cors/) — install it, register it once in `theo.config.ts`. Endpoint registration is **not** automatic; wire each endpoint via `defineRoute` in your `server/routes/` directory (e.g., a route that calls `handleSttRequest` / `handleTtsRequest`).
 - Browser-side `MediaRecorder` helper that throws typed errors instead of `DOMException` — so `<VoiceRecorderBar>` can render an actionable `<Alert kind="auth">` when the user denied the mic.
 - Provider-agnostic STT (OpenAI Whisper or Groq Whisper) selected via env var.
 - Synchronous config validation: missing `OPENAI_API_KEY` throws `VoicePluginConfigError` at boot, not on the first user click.

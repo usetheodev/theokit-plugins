@@ -151,6 +151,30 @@ describe('createArtifactRouteHandlers', () => {
     expect(await store.get('a1')).toBeNull()
   })
 
+  it('GET /artifacts?kind=bogus returns 400 INVALID_KIND', async () => {
+    const store = createInMemoryArtifactStore()
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.list(
+      new Request('http://x/artifacts?kind=bogus', { method: 'GET' }),
+    )
+    expect(res.status).toBe(400)
+    const json = (await res.json()) as { error: { code: string; message: string } }
+    expect(json.error.code).toBe('INVALID_KIND')
+    expect(json.error.message).toMatch(/bogus/)
+  })
+
+  it('GET /artifacts?kind=markdown passes valid kind filter', async () => {
+    const store = createInMemoryArtifactStore()
+    await store.insert(md({ id: 'a' }))
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.list(
+      new Request('http://x/artifacts?kind=markdown', { method: 'GET' }),
+    )
+    expect(res.status).toBe(200)
+    const json = (await res.json()) as { artifacts: Artifact[] }
+    expect(json.artifacts).toHaveLength(1)
+  })
+
   it('DELETE returns 404 when not found', async () => {
     const store = createInMemoryArtifactStore()
     const handlers = createArtifactRouteHandlers({ store })
@@ -159,5 +183,41 @@ describe('createArtifactRouteHandlers', () => {
       version: 1,
     })
     expect(res.status).toBe(404)
+  })
+
+  it('T1.4: 500 error does not leak internal message', async () => {
+    const store = createInMemoryArtifactStore()
+    // Override list to throw an internal error
+    store.list = () => {
+      throw new Error('SQLITE_ERROR: no such table')
+    }
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.list(
+      new Request('http://x/artifacts', { method: 'GET' }),
+    )
+    expect(res.status).toBe(500)
+    const text = await res.text()
+    expect(text).toContain('Internal Server Error')
+    expect(text).not.toContain('SQLITE_ERROR')
+  })
+
+  it('T3.1: onAfterInsert error is logged but response is still 201', async () => {
+    const store = createInMemoryArtifactStore()
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const handlers = createArtifactRouteHandlers({
+      store,
+      onAfterInsert: () => {
+        throw new Error('side-effect boom')
+      },
+    })
+    const res = await handlers.create(jsonRequest('POST', 'http://x/artifacts', md()))
+    expect(res.status).toBe(201)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('onAfterInsert'),
+      expect.objectContaining({
+        error: expect.any(Error),
+      }),
+    )
+    consoleSpy.mockRestore()
   })
 })

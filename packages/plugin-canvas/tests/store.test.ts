@@ -9,6 +9,7 @@ import {
   CanvasArtifactNotFoundError,
   CanvasPluginError,
   createInMemoryArtifactStore,
+  createSqliteArtifactStore,
 } from '../src/index.js'
 import type { Artifact } from '../src/schema.js'
 
@@ -157,5 +158,73 @@ describe('createInMemoryArtifactStore', () => {
   it('delete missing id (no version) is a no-op', async () => {
     const store = createInMemoryArtifactStore()
     await expect(store.delete('nope')).resolves.toBeUndefined()
+  })
+})
+
+describe('createSqliteArtifactStore — table name validation', () => {
+  const fakeDb = {} as Parameters<typeof createSqliteArtifactStore>[0]['db']
+
+  it('rejects table name with SQL injection payload', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: 'artifacts; DROP TABLE users--',
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('rejects empty table name', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: '',
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('rejects table name with spaces', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: 'my table',
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('accepts valid table name', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: 'canvas_artifacts',
+        autoMigrate: false,
+      }),
+    ).not.toThrow()
+  })
+
+  it('F7: boundary — 63-char name accepted, 64-char name rejected', () => {
+    // 63 chars: 1 leading letter + 62 underscores = exactly at the limit
+    const name63 = 'a' + '_'.repeat(62)
+    expect(name63).toHaveLength(63)
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: name63,
+        autoMigrate: false,
+      }),
+    ).not.toThrow()
+
+    // 64 chars: exceeds the regex ^[a-zA-Z_][a-zA-Z0-9_]{0,62}$
+    const name64 = 'a' + '_'.repeat(63)
+    expect(name64).toHaveLength(64)
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: name64,
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
   })
 })

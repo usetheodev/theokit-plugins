@@ -1,0 +1,50 @@
+{
+  "name": "@theokit/auth-magic-link",
+  "version": "0.1.0",
+  "description": "Email magic-link provider for @theokit/sdk/server/auth. Pluggable MagicLinkStore + email-callback for any transport (Resend/SendGrid/SMTP).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@theokit/sdk": ">=1.6.0",
+    "theokit": ">=0.2.4"
+  },
+  "devDependencies": {
+    "@theokit/sdk": "npm:@theokit/sdk@next",
+    "theokit": "link:../../../theokit/packages/theo",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.8"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "keywords": [
+    "theokit",
+    "theokit-plugin",
+    "auth",
+    "magic-link",
+    "email",
+    "passwordless"
+  ],
+  "author": "@theokit",
+  "license": "MIT"
+}

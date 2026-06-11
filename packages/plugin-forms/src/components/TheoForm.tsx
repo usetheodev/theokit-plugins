@@ -120,8 +120,12 @@ function TheoFormRootInner<TInput extends FieldValues, TData>(
             form.setError as unknown as (n: string, e: { type: string; message: string }) => void,
             fields,
           );
+        } else {
+          // Non-ActionInputError: rethrow so it propagates (e.g., onSuccess
+          // throwing, network errors). Swallowing arbitrary errors silently
+          // violates fail-fast — only validation errors are form-local.
+          throw err;
         }
-        // Non-validation errors bubble via useAction.error (Context value).
       }
     },
     [action_, form.setError, onSuccess],

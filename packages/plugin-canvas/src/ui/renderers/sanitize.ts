@@ -1,30 +1,11 @@
 /**
  * Defence-in-depth sanitisation for renderer-side SVG and HTML content.
  *
- * The schema layer (`enforceArtifactSecurity`) already rejects obvious
- * threats at the boundary. These helpers run AGAIN at render time so
- * that:
- *
- *   - a stored artifact tampered with after creation cannot bypass the
- *     boundary check (defense in depth);
- *   - apps that bypass the boundary (e.g. inject artifacts into the
- *     renderer directly from a trusted internal source) still benefit
- *     from the strip;
- *   - the user can SEE what we removed (we annotate stripped content
- *     with HTML comments instead of silently dropping).
- *
- * The allowlist approach is intentionally permissive on graphical SVG
- * (lots of innocuous attributes) and strict on dynamic vectors (no JS,
- * no external loads).
+ * Uses DOMPurify (DOM-based parser + allowlist) instead of regex to
+ * eliminate the class of XSS bypass vectors inherent to regex-based
+ * HTML parsing (OWASP recommendation). See plan T1.2 / ADR D1.
  */
-
-const SCRIPT_TAG_RE = /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi
-const IFRAME_TAG_RE = /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe\s*>/gi
-const OBJECT_TAG_RE = /<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object\s*>/gi
-const EMBED_TAG_RE = /<embed\b[^>]*\/?>/gi
-const ON_ATTR_RE = /\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi
-const JS_URL_ATTR_RE = /(href|src|xlink:href|action|formaction)\s*=\s*(?:"\s*javascript:[^"]*"|'\s*javascript:[^']*'|javascript:[^\s>]+)/gi
-const DATA_URL_SCRIPT_RE = /(href|src|xlink:href)\s*=\s*(?:"\s*data:(?:text\/html|application\/javascript)[^"]*"|'\s*data:(?:text\/html|application\/javascript)[^']*')/gi
+import DOMPurify from 'isomorphic-dompurify'
 
 export interface SanitizeReport {
   removedScript: boolean
@@ -41,8 +22,8 @@ export interface SanitizeResult {
   report: SanitizeReport
 }
 
-export function sanitizeSvg(input: string): SanitizeResult {
-  const report: SanitizeReport = {
+function createEmptyReport(): SanitizeReport {
+  return {
     removedScript: false,
     removedIframe: false,
     removedObject: false,
@@ -51,60 +32,83 @@ export function sanitizeSvg(input: string): SanitizeResult {
     removedJsUrl: false,
     removedDataUrl: false,
   }
-  let output = input
-
-  output = output.replace(SCRIPT_TAG_RE, () => {
-    report.removedScript = true
-    return '<!-- script tag stripped -->'
-  })
-  output = output.replace(IFRAME_TAG_RE, () => {
-    report.removedIframe = true
-    return '<!-- iframe stripped -->'
-  })
-  output = output.replace(OBJECT_TAG_RE, () => {
-    report.removedObject = true
-    return '<!-- object stripped -->'
-  })
-  output = output.replace(EMBED_TAG_RE, () => {
-    report.removedEmbed = true
-    return '<!-- embed stripped -->'
-  })
-  output = output.replace(ON_ATTR_RE, () => {
-    report.removedOnHandler = true
-    return ''
-  })
-  output = output.replace(JS_URL_ATTR_RE, () => {
-    report.removedJsUrl = true
-    return ''
-  })
-  output = output.replace(DATA_URL_SCRIPT_RE, () => {
-    report.removedDataUrl = true
-    return ''
-  })
-
-  return { output, report }
 }
 
 /**
- * The HTML sandbox iframe relies on the browser's `sandbox` attribute
- * for isolation. This helper only strips the most dangerous patterns
- * that can break out of sandbox guarantees (top-level meta refresh,
- * which can navigate the parent in some sandbox modes).
+ * Classify what DOMPurify removed by comparing input patterns.
+ * DOMPurify hooks don't reliably report everything it strips,
+ * so we detect removals by checking what was in the input but
+ * absent from the output.
  */
-export function sanitizeHtmlSrcdoc(input: string): SanitizeResult {
-  const report: SanitizeReport = {
-    removedScript: false,
-    removedIframe: false,
-    removedObject: false,
-    removedEmbed: false,
-    removedOnHandler: false,
-    removedJsUrl: false,
-    removedDataUrl: false,
-  }
-  let output = input
-  output = output.replace(/<meta\s+http-equiv\s*=\s*['"]refresh['"][^>]*>/gi, () => {
-    report.removedScript = true // overload — semantic == "stripped top-nav vector"
-    return '<!-- meta refresh stripped -->'
+function classifyRemovals(input: string, output: string): SanitizeReport {
+  const report = createEmptyReport()
+  const inLower = input.toLowerCase()
+  const outLower = output.toLowerCase()
+
+  if (/<script\b/i.test(input) && !/<script\b/i.test(output))
+    report.removedScript = true
+  if (/<iframe\b/i.test(input) && !/<iframe\b/i.test(output))
+    report.removedIframe = true
+  if (/<object\b/i.test(input) && !/<object\b/i.test(output))
+    report.removedObject = true
+  if (/<embed\b/i.test(input) && !/<embed\b/i.test(output))
+    report.removedEmbed = true
+  if (/\bon[a-z]+\s*=/i.test(inLower) && !/\bon[a-z]+\s*=/i.test(outLower))
+    report.removedOnHandler = true
+  // Newline-evaded on-handlers: on\n + event name
+  if (/on\s+[a-z]+\s*=/i.test(inLower) && !/on\s+[a-z]+\s*=/i.test(outLower))
+    report.removedOnHandler = true
+  if (/javascript\s*:/i.test(inLower) && !/javascript\s*:/i.test(outLower))
+    report.removedJsUrl = true
+  if (/data:(?:text\/html|application\/javascript)/i.test(inLower) &&
+    !/data:(?:text\/html|application\/javascript)/i.test(outLower))
+    report.removedDataUrl = true
+
+  return report
+}
+
+export function sanitizeSvg(input: string): SanitizeResult {
+  const output = DOMPurify.sanitize(input, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'foreignObject',
+      'math', 'annotation-xml'],
+    FORBID_ATTR: ['formaction'],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_UNKNOWN_PROTOCOLS: false,
+    // Strip all on-event attributes
+    ADD_ATTR: [],
   })
+
+  // Post-sanitize: strip any remaining dangerous patterns DOMPurify
+  // might have kept (defense in depth)
+  let cleaned = output
+    // Strip javascript: URIs that survived
+    .replace(/(href|src|xlink:href)\s*=\s*"[^"]*javascript:[^"]*"/gi, '')
+    .replace(/(href|src|xlink:href)\s*=\s*'[^']*javascript:[^']*'/gi, '')
+    // Strip data: URIs for text/html and application/javascript
+    .replace(/(href|src|xlink:href)\s*=\s*"[^"]*data:(?:text\/html|application\/javascript)[^"]*"/gi, '')
+    .replace(/(href|src|xlink:href)\s*=\s*'[^']*data:(?:text\/html|application\/javascript)[^']*'/gi, '')
+    // Strip CSS expression()
+    .replace(/expression\s*\([^)]*\)/gi, '')
+    // Strip external URLs in <use> xlink:href (allow only fragment refs)
+    .replace(/(<use[^>]*(?:href|xlink:href)\s*=\s*")https?:\/\/[^"]*(")/gi, '$1$2')
+    .replace(/(<use[^>]*(?:href|xlink:href)\s*=\s*')https?:\/\/[^']*(')/gi, '$1$2')
+
+  const report = classifyRemovals(input, cleaned)
+  return { output: cleaned, report }
+}
+
+export function sanitizeHtmlSrcdoc(input: string): SanitizeResult {
+  const output = DOMPurify.sanitize(input, {
+    FORBID_TAGS: ['meta'],
+    ALLOW_DATA_ATTR: false,
+  })
+
+  const report = createEmptyReport()
+  if (/<meta[^>]*http-equiv\s*=\s*['"]refresh/i.test(input) &&
+    !/<meta[^>]*http-equiv\s*=\s*['"]refresh/i.test(output)) {
+    report.removedScript = true
+  }
+
   return { output, report }
 }

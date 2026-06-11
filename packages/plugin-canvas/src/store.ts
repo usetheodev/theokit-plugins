@@ -175,10 +175,17 @@ function rowToArtifact(row: ArtifactRow): Artifact {
   return validation.artifact
 }
 
+const VALID_TABLE_NAME = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/
+
 export function createSqliteArtifactStore(
   options: CreateSqliteArtifactStoreOptions,
 ): ArtifactStore {
   const table = options.table ?? 'canvas_artifacts'
+  if (!VALID_TABLE_NAME.test(table)) {
+    throw new TypeError(
+      `Invalid table name: "${table}". Must match ${VALID_TABLE_NAME}.`,
+    )
+  }
   const { db } = options
   // `.bind(db)` is mandatory — better-sqlite3 exposes `exec` as a
   // prototype method that reads `this[Symbol(NativeDB)]` internally,
@@ -194,119 +201,167 @@ export function createSqliteArtifactStore(
         }
 
   if (options.autoMigrate !== false) {
-    exec(`
-      CREATE TABLE IF NOT EXISTS ${table} (
-        id TEXT NOT NULL,
-        version INTEGER NOT NULL,
-        session_id TEXT,
-        kind TEXT NOT NULL,
-        title TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        PRIMARY KEY (id, version)
-      )
-    `)
-    exec(`CREATE INDEX IF NOT EXISTS idx_${table}_session ON ${table}(session_id, created_at DESC)`)
-    exec(`CREATE INDEX IF NOT EXISTS idx_${table}_id ON ${table}(id, version)`)
+    migrate(exec, table)
   }
 
   return {
-    async insert(artifact) {
-      const validation = validateArtifact(artifact)
-      if (!validation.ok) throw validation.error
-      const a = validation.artifact
-      const payload = JSON.stringify(stripEnvelope(a))
-      try {
-        db.prepare(
-          `INSERT INTO ${table} (id, version, session_id, kind, title, payload, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        ).run(
-          a.id,
-          a.version,
-          a.sessionId ?? null,
-          a.kind,
-          a.title,
-          payload,
-          typeof a.createdAt === 'string' ? a.createdAt : new Date(a.createdAt).toISOString(),
-        )
-      } catch (err) {
-        throw new CanvasPluginError(
-          `Insert failed for artifact "${a.id}@v${a.version}".`,
-          { cause: err },
-        )
-      }
-      return a
-    },
-    async get(id, version) {
-      const row =
-        version === undefined
-          ? db
-              .prepare(`SELECT * FROM ${table} WHERE id = ? ORDER BY version DESC LIMIT 1`)
-              .get(id)
-          : db.prepare(`SELECT * FROM ${table} WHERE id = ? AND version = ?`).get(id, version)
-      if (row === undefined || row === null) return null
-      return rowToArtifact(row as ArtifactRow)
-    },
-    async getVersions(id) {
-      const rows = db
-        .prepare(`SELECT * FROM ${table} WHERE id = ? ORDER BY version ASC`)
-        .all(id) as ArtifactRow[]
-      return rows.map(rowToArtifact)
-    },
-    async list(filter = {}) {
-      const mode = filter.mode ?? 'latest'
-      const offset = filter.offset ?? 0
-      const limit = filter.limit ?? 200
-      const params: unknown[] = []
-      const where: string[] = []
-      if (filter.sessionId !== undefined) {
-        where.push('session_id = ?')
-        params.push(filter.sessionId)
-      }
-      if (filter.kind !== undefined) {
-        where.push('kind = ?')
-        params.push(filter.kind)
-      }
-      const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
-      const sql =
-        mode === 'latest'
-          ? `
-            SELECT t.* FROM ${table} t
-            INNER JOIN (
-              SELECT id, MAX(version) AS max_version
-              FROM ${table} ${whereClause}
-              GROUP BY id
-            ) m ON m.id = t.id AND m.max_version = t.version
-            ORDER BY t.created_at DESC
-            LIMIT ? OFFSET ?
-          `
-          : `
-            SELECT * FROM ${table} ${whereClause}
-            ORDER BY created_at DESC, version DESC
-            LIMIT ? OFFSET ?
-          `
-      const finalParams = mode === 'latest' ? [...params, limit, offset] : [...params, limit, offset]
-      const rows = db.prepare(sql).all(...finalParams) as ArtifactRow[]
-      return rows.map(rowToArtifact)
-    },
-    async nextVersion(id) {
-      const row = db
-        .prepare(`SELECT MAX(version) AS max_v FROM ${table} WHERE id = ?`)
-        .get(id) as { max_v: number | null } | undefined
-      const max = row?.max_v ?? null
-      return max === null ? 1 : max + 1
-    },
-    async delete(id, version) {
-      const stmt =
-        version === undefined
-          ? db.prepare(`DELETE FROM ${table} WHERE id = ?`)
-          : db.prepare(`DELETE FROM ${table} WHERE id = ? AND version = ?`)
-      const result =
-        version === undefined ? (stmt.run(id) as { changes?: number }) : (stmt.run(id, version) as { changes?: number })
-      if ((result.changes ?? 0) === 0) {
-        throw new CanvasArtifactNotFoundError(version === undefined ? id : `${id}@v${version}`)
-      }
-    },
+    insert: (artifact) => insertArtifact(db, table, artifact),
+    get: (id, version) => getArtifact(db, table, id, version),
+    getVersions: (id) => getArtifactVersions(db, table, id),
+    list: (filter = {}) => listArtifacts(db, table, filter),
+    nextVersion: (id) => queryNextVersion(db, table, id),
+    delete: (id, version) => deleteArtifact(db, table, id, version),
+  }
+}
+
+// ───── Extracted per-query functions ─────
+
+function migrate(exec: (sql: string) => void, table: string): void {
+  exec(`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      session_id TEXT,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (id, version)
+    )
+  `)
+  exec(`CREATE INDEX IF NOT EXISTS idx_${table}_session ON ${table}(session_id, created_at DESC)`)
+  exec(`CREATE INDEX IF NOT EXISTS idx_${table}_id ON ${table}(id, version)`)
+}
+
+async function insertArtifact(
+  db: SqliteDb,
+  table: string,
+  artifact: Artifact,
+): Promise<Artifact> {
+  const validation = validateArtifact(artifact)
+  if (!validation.ok) throw validation.error
+  const a = validation.artifact
+  const payload = JSON.stringify(stripEnvelope(a))
+  try {
+    db.prepare(
+      `INSERT INTO ${table} (id, version, session_id, kind, title, payload, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      a.id,
+      a.version,
+      a.sessionId ?? null,
+      a.kind,
+      a.title,
+      payload,
+      typeof a.createdAt === 'string' ? a.createdAt : new Date(a.createdAt).toISOString(),
+    )
+  } catch (err) {
+    throw new CanvasPluginError(
+      `Insert failed for artifact "${a.id}@v${a.version}".`,
+      { cause: err },
+    )
+  }
+  return a
+}
+
+async function getArtifact(
+  db: SqliteDb,
+  table: string,
+  id: string,
+  version?: number,
+): Promise<Artifact | null> {
+  const row =
+    version === undefined
+      ? db
+          .prepare(`SELECT * FROM ${table} WHERE id = ? ORDER BY version DESC LIMIT 1`)
+          .get(id)
+      : db.prepare(`SELECT * FROM ${table} WHERE id = ? AND version = ?`).get(id, version)
+  if (row === undefined || row === null) return null
+  return rowToArtifact(row as ArtifactRow)
+}
+
+async function getArtifactVersions(
+  db: SqliteDb,
+  table: string,
+  id: string,
+): Promise<Artifact[]> {
+  const rows = db
+    .prepare(`SELECT * FROM ${table} WHERE id = ? ORDER BY version ASC`)
+    .all(id) as ArtifactRow[]
+  return rows.map(rowToArtifact)
+}
+
+function buildWhereClause(filter: ArtifactListFilter): { whereClause: string; params: unknown[] } {
+  const params: unknown[] = []
+  const where: string[] = []
+  if (filter.sessionId !== undefined) {
+    where.push('session_id = ?')
+    params.push(filter.sessionId)
+  }
+  if (filter.kind !== undefined) {
+    where.push('kind = ?')
+    params.push(filter.kind)
+  }
+  const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
+  return { whereClause, params }
+}
+
+async function listArtifacts(
+  db: SqliteDb,
+  table: string,
+  filter: ArtifactListFilter,
+): Promise<Artifact[]> {
+  const mode = filter.mode ?? 'latest'
+  const offset = filter.offset ?? 0
+  const limit = filter.limit ?? 200
+  const { whereClause, params } = buildWhereClause(filter)
+  const sql =
+    mode === 'latest'
+      ? `
+        SELECT t.* FROM ${table} t
+        INNER JOIN (
+          SELECT id, MAX(version) AS max_version
+          FROM ${table} ${whereClause}
+          GROUP BY id
+        ) m ON m.id = t.id AND m.max_version = t.version
+        ORDER BY t.created_at DESC
+        LIMIT ? OFFSET ?
+      `
+      : `
+        SELECT * FROM ${table} ${whereClause}
+        ORDER BY created_at DESC, version DESC
+        LIMIT ? OFFSET ?
+      `
+  const rows = db.prepare(sql).all(...params, limit, offset) as ArtifactRow[]
+  return rows.map(rowToArtifact)
+}
+
+async function queryNextVersion(
+  db: SqliteDb,
+  table: string,
+  id: string,
+): Promise<number> {
+  const row = db
+    .prepare(`SELECT MAX(version) AS max_v FROM ${table} WHERE id = ?`)
+    .get(id) as { max_v: number | null } | undefined
+  const max = row?.max_v ?? null
+  return max === null ? 1 : max + 1
+}
+
+async function deleteArtifact(
+  db: SqliteDb,
+  table: string,
+  id: string,
+  version?: number,
+): Promise<void> {
+  const stmt =
+    version === undefined
+      ? db.prepare(`DELETE FROM ${table} WHERE id = ?`)
+      : db.prepare(`DELETE FROM ${table} WHERE id = ? AND version = ?`)
+  const result =
+    version === undefined ? (stmt.run(id) as { changes?: number }) : (stmt.run(id, version) as { changes?: number })
+  if ((result.changes ?? 0) === 0) {
+    throw new CanvasArtifactNotFoundError(version === undefined ? id : `${id}@v${version}`)
   }
 }
 
