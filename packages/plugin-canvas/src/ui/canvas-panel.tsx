@@ -1,14 +1,13 @@
-import { Button, CopyButton, Tooltip } from '@theokit/ui'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import type { Artifact } from '../schema.js'
-import { ArtifactRenderer } from './artifact-renderer.js'
 import {
   artifactToBlob,
   filenameFor,
   serializeArtifactForCopy,
 } from './artifact-actions.js'
-import { ArtifactVersionRail } from './artifact-version-rail.js'
+import { CanvasToolbar } from './canvas-toolbar.js'
+import { CanvasArtifactList } from './canvas-artifact-list.js'
 import type { ArtifactRendererRegistry } from './renderers/types.js'
 
 export type CanvasPanelToolbarAction = 'copy' | 'download' | 'fork' | 'close'
@@ -39,8 +38,6 @@ export interface CanvasPanelProps {
   /** Override the inner aria-label for the artifact title region. */
   'aria-label'?: string
 }
-
-const NOOP = () => undefined
 
 /**
  * `<CanvasPanel>` — controlled side surface that mounts an
@@ -150,87 +147,22 @@ export function CanvasPanel({
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {artifact !== null && !hidden.has('copy') ? (
-            <CopyButton
-              value={copyText}
-              variant="outline"
-              size="sm"
-              label="Copy"
-              data-testid="canvas-toolbar-copy"
-              aria-label="Copy artifact content"
-            />
-          ) : null}
-          {artifact !== null && !hidden.has('download') ? (
-            <Tooltip label="Download artifact">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void handleDownload()}
-                data-testid="canvas-toolbar-download"
-                aria-label="Download artifact"
-              >
-                Download
-              </Button>
-            </Tooltip>
-          ) : null}
-          {artifact !== null && onFork !== undefined && !hidden.has('fork') ? (
-            <Tooltip label="Fork artifact">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleFork}
-                data-testid="canvas-toolbar-fork"
-                aria-label="Fork artifact"
-              >
-                Fork
-              </Button>
-            </Tooltip>
-          ) : null}
-          {!hidden.has('close') ? (
-            <Tooltip label="Close canvas panel">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleClose}
-                data-testid="canvas-toolbar-close"
-                aria-label="Close canvas panel"
-              >
-                ✕
-              </Button>
-            </Tooltip>
-          ) : null}
-        </div>
+        <CanvasToolbar
+          artifact={artifact}
+          copyText={copyText}
+          hidden={hidden}
+          onDownload={() => void handleDownload()}
+          onFork={onFork !== undefined ? handleFork : undefined}
+          onClose={handleClose}
+        />
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1 overflow-auto">
-          {artifact !== null ? (
-            <ArtifactRenderer
-              // key on id + version so renderers fully remount between
-              // artifacts (cheaper than memoised diff in renderer trees
-              // that own external state like Mermaid).
-              key={`${artifact.id}-v${artifact.version}`}
-              artifact={artifact}
-              renderers={renderers}
-            />
-          ) : (
-            <div
-              data-testid="canvas-panel-empty"
-              className="grid h-full place-items-center p-6 text-center text-sm text-muted-foreground"
-            >
-              Nothing in the canvas yet. Ask the agent to draw, draft, or compose something.
-            </div>
-          )}
-        </div>
-        {artifact !== null && versions !== undefined && versions.length > 1 ? (
-          <ArtifactVersionRail
-            versions={versions}
-            currentVersion={artifact.version}
-            onSelect={onVersionSelect ?? NOOP}
-          />
-        ) : null}
-      </div>
+      <CanvasArtifactList
+        artifact={artifact}
+        versions={versions}
+        onVersionSelect={onVersionSelect}
+        renderers={renderers}
+      />
     </aside>
   )
 }
