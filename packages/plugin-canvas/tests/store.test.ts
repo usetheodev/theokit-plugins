@@ -9,6 +9,7 @@ import {
   CanvasArtifactNotFoundError,
   CanvasPluginError,
   createInMemoryArtifactStore,
+  createSqliteArtifactStore,
 } from '../src/index.js'
 import type { Artifact } from '../src/schema.js'
 
@@ -157,5 +158,49 @@ describe('createInMemoryArtifactStore', () => {
   it('delete missing id (no version) is a no-op', async () => {
     const store = createInMemoryArtifactStore()
     await expect(store.delete('nope')).resolves.toBeUndefined()
+  })
+})
+
+describe('createSqliteArtifactStore — table name validation', () => {
+  const fakeDb = {} as Parameters<typeof createSqliteArtifactStore>[0]['db']
+
+  it('rejects table name with SQL injection payload', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: 'artifacts; DROP TABLE users--',
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('rejects empty table name', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: '',
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('rejects table name with spaces', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: 'my table',
+        autoMigrate: false,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('accepts valid table name', () => {
+    expect(() =>
+      createSqliteArtifactStore({
+        db: fakeDb,
+        table: 'canvas_artifacts',
+        autoMigrate: false,
+      }),
+    ).not.toThrow()
   })
 })

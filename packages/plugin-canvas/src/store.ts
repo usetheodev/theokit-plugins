@@ -175,10 +175,17 @@ function rowToArtifact(row: ArtifactRow): Artifact {
   return validation.artifact
 }
 
+const VALID_TABLE_NAME = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/
+
 export function createSqliteArtifactStore(
   options: CreateSqliteArtifactStoreOptions,
 ): ArtifactStore {
   const table = options.table ?? 'canvas_artifacts'
+  if (!VALID_TABLE_NAME.test(table)) {
+    throw new TypeError(
+      `Invalid table name: "${table}". Must match ${VALID_TABLE_NAME}.`,
+    )
+  }
   const { db } = options
   // `.bind(db)` is mandatory — better-sqlite3 exposes `exec` as a
   // prototype method that reads `this[Symbol(NativeDB)]` internally,
