@@ -151,6 +151,30 @@ describe('createArtifactRouteHandlers', () => {
     expect(await store.get('a1')).toBeNull()
   })
 
+  it('GET /artifacts?kind=bogus returns 400 INVALID_KIND', async () => {
+    const store = createInMemoryArtifactStore()
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.list(
+      new Request('http://x/artifacts?kind=bogus', { method: 'GET' }),
+    )
+    expect(res.status).toBe(400)
+    const json = (await res.json()) as { error: { code: string; message: string } }
+    expect(json.error.code).toBe('INVALID_KIND')
+    expect(json.error.message).toMatch(/bogus/)
+  })
+
+  it('GET /artifacts?kind=markdown passes valid kind filter', async () => {
+    const store = createInMemoryArtifactStore()
+    await store.insert(md({ id: 'a' }))
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.list(
+      new Request('http://x/artifacts?kind=markdown', { method: 'GET' }),
+    )
+    expect(res.status).toBe(200)
+    const json = (await res.json()) as { artifacts: Artifact[] }
+    expect(json.artifacts).toHaveLength(1)
+  })
+
   it('DELETE returns 404 when not found', async () => {
     const store = createInMemoryArtifactStore()
     const handlers = createArtifactRouteHandlers({ store })

@@ -25,7 +25,7 @@ import {
   CanvasArtifactValidationError,
   CanvasPluginError,
 } from './errors.js'
-import { validateArtifact } from './schema.js'
+import { ARTIFACT_KINDS, validateArtifact } from './schema.js'
 import type { ArtifactListFilter, ArtifactStore } from './store.js'
 
 export interface ArtifactRouteHandlerOptions {
@@ -59,7 +59,7 @@ function jsonError(status: number, code: string, message: string): Response {
   return jsonResponse({ error: { code, message } }, { status })
 }
 
-function parseListFilter(url: URL): ArtifactListFilter {
+function parseListFilter(url: URL): ArtifactListFilter | Response {
   const f: ArtifactListFilter = {}
   const session = url.searchParams.get('session')
   const kind = url.searchParams.get('kind')
@@ -67,7 +67,16 @@ function parseListFilter(url: URL): ArtifactListFilter {
   const offset = url.searchParams.get('offset')
   const limit = url.searchParams.get('limit')
   if (session !== null) f.sessionId = session
-  if (kind !== null) f.kind = kind as ArtifactListFilter['kind']
+  if (kind !== null) {
+    if (!(ARTIFACT_KINDS as readonly string[]).includes(kind)) {
+      return jsonError(
+        400,
+        'INVALID_KIND',
+        `Invalid artifact kind "${kind}". Valid kinds: ${ARTIFACT_KINDS.join(', ')}.`,
+      )
+    }
+    f.kind = kind as ArtifactListFilter['kind']
+  }
   if (mode === 'latest' || mode === 'all') f.mode = mode
   if (offset !== null) {
     const n = Number(offset)
@@ -92,8 +101,9 @@ export function createArtifactRouteHandlers(
   return {
     async list(request) {
       try {
-        const filter = parseListFilter(new URL(request.url))
-        const rows = await store.list(filter)
+        const filterOrError = parseListFilter(new URL(request.url))
+        if (filterOrError instanceof Response) return filterOrError
+        const rows = await store.list(filterOrError)
         return jsonResponse({ artifacts: rows })
       } catch (err) {
         return errorToResponse(err)
