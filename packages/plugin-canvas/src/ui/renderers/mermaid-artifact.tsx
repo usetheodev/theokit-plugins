@@ -8,31 +8,30 @@ interface MermaidApi {
   render(id: string, source: string): Promise<{ svg: string }>
 }
 
-let mermaidInstance: MermaidApi | null = null
-let mermaidLoadError = false
+let pending: Promise<MermaidApi | null> | null = null
 
-async function loadMermaid(): Promise<MermaidApi | null> {
-  if (mermaidInstance !== null) return mermaidInstance
-  if (mermaidLoadError) return null
-  try {
-    // Optional peer dep. The specifier MUST be a string literal so Vite
-    // can statically analyse the dynamic import and pre-bundle the dep
-    // when the consumer installs it — `const s='mermaid'; import(s)`
-    // works for tsup but Vite fails with "Failed to resolve module
-    // specifier 'mermaid'" because dev-mode resolution requires a
-    // literal it can trace. tsup keeps the import as `import('mermaid')`
-    // because `mermaid` is listed in tsup external.
-    // @ts-ignore optional peer dep — types resolve only when the
-    // consumer installs `mermaid`; absent it, we fall back gracefully.
-    const mod = (await import('mermaid')) as unknown as { default: MermaidApi }
-    const instance = mod.default
-    instance.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark' })
-    mermaidInstance = instance
-    return instance
-  } catch {
-    mermaidLoadError = true
-    return null
+function loadMermaid(): Promise<MermaidApi | null> {
+  if (!pending) {
+    pending = (async () => {
+      // Optional peer dep. The specifier MUST be a string literal so Vite
+      // can statically analyse the dynamic import and pre-bundle the dep
+      // when the consumer installs it — `const s='mermaid'; import(s)`
+      // works for tsup but Vite fails with "Failed to resolve module
+      // specifier 'mermaid'" because dev-mode resolution requires a
+      // literal it can trace. tsup keeps the import as `import('mermaid')`
+      // because `mermaid` is listed in tsup external.
+      // @ts-ignore optional peer dep — types resolve only when the
+      // consumer installs `mermaid`; absent it, we fall back gracefully.
+      const mod = (await import('mermaid')) as unknown as { default: MermaidApi }
+      const instance = mod.default
+      instance.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark' })
+      return instance
+    })().catch(() => {
+      pending = null // clear on error so next caller retries
+      return null
+    })
   }
+  return pending
 }
 
 /**

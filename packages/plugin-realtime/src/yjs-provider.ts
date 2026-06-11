@@ -63,34 +63,36 @@ interface YAwarenessModule {
   applyAwarenessUpdate(awareness: AwarenessLike, update: Uint8Array, origin?: unknown): void;
 }
 
-let cachedYjs: YjsModule | null = null;
-let cachedAwareness: YAwarenessModule | null = null;
+let pendingYjs: Promise<{ yjs: YjsModule; awareness: YAwarenessModule }> | null = null;
 
-async function loadYjs(): Promise<{ yjs: YjsModule; awareness: YAwarenessModule }> {
-  if (cachedYjs !== null && cachedAwareness !== null) {
-    return { yjs: cachedYjs, awareness: cachedAwareness };
+function loadYjs(): Promise<{ yjs: YjsModule; awareness: YAwarenessModule }> {
+  if (!pendingYjs) {
+    pendingYjs = (async () => {
+      let yjsModule: YjsModule;
+      let awarenessModule: YAwarenessModule;
+      try {
+        yjsModule = (await import("yjs")) as unknown as YjsModule;
+      } catch (cause) {
+        throw new RealtimeError(
+          "`yjs` peer dependency not installed. Run `pnpm add yjs y-protocols` to use YjsRealtimeProvider.",
+          { code: "yjs_peer_missing", cause },
+        );
+      }
+      try {
+        awarenessModule = (await import("y-protocols/awareness.js")) as unknown as YAwarenessModule;
+      } catch (cause) {
+        throw new RealtimeError(
+          "`y-protocols/awareness` peer dependency not installed. Run `pnpm add y-protocols` to use YjsRealtimeProvider.",
+          { code: "y_protocols_peer_missing", cause },
+        );
+      }
+      return { yjs: yjsModule, awareness: awarenessModule };
+    })().catch((err) => {
+      pendingYjs = null; // clear on error so next caller retries
+      throw err;
+    });
   }
-  let yjsModule: YjsModule;
-  let awarenessModule: YAwarenessModule;
-  try {
-    yjsModule = (await import("yjs")) as unknown as YjsModule;
-  } catch (cause) {
-    throw new RealtimeError(
-      "`yjs` peer dependency not installed. Run `pnpm add yjs y-protocols` to use YjsRealtimeProvider.",
-      { code: "yjs_peer_missing", cause },
-    );
-  }
-  try {
-    awarenessModule = (await import("y-protocols/awareness.js")) as unknown as YAwarenessModule;
-  } catch (cause) {
-    throw new RealtimeError(
-      "`y-protocols/awareness` peer dependency not installed. Run `pnpm add y-protocols` to use YjsRealtimeProvider.",
-      { code: "y_protocols_peer_missing", cause },
-    );
-  }
-  cachedYjs = yjsModule;
-  cachedAwareness = awarenessModule;
-  return { yjs: yjsModule, awareness: awarenessModule };
+  return pendingYjs;
 }
 
 interface YjsRoomState {
@@ -157,8 +159,11 @@ export function createYjsRealtimeProvider(
     for (const listener of state.listeners) {
       try {
         listener(frame);
-      } catch {
-        // Listener errors must not break broadcast loop.
+      } catch (listenerErr) {
+        console.error('[plugin-realtime] listener error in fanout:', {
+          event: frame.type ?? 'unknown',
+          error: listenerErr,
+        })
       }
     }
   };
