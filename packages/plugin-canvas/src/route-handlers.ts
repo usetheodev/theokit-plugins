@@ -125,8 +125,12 @@ export function createArtifactRouteHandlers(
         if (onAfterInsert !== undefined) {
           try {
             await onAfterInsert(stored)
-          } catch {
-            // best-effort fan-out — never fail the publish on side-effect error.
+          } catch (sideEffectErr) {
+            console.error('[plugin-canvas] onAfterInsert side-effect failed:', {
+              artifactId: stored.id,
+              version: stored.version,
+              error: sideEffectErr,
+            })
           }
         }
         return jsonResponse({ artifact: stored }, { status: 201 })
@@ -178,8 +182,9 @@ function errorToResponse(err: unknown): Response {
     return jsonError(400, 'INVALID_ARTIFACT', err.message)
   }
   if (isCanvasError(err)) {
-    return jsonError(500, 'CANVAS_PLUGIN_ERROR', err.message)
+    console.error('[plugin-canvas] unhandled canvas error:', err)
+    return jsonError(500, 'CANVAS_PLUGIN_ERROR', 'Internal Server Error')
   }
-  const message = err instanceof Error ? err.message : 'unknown error'
-  return jsonError(500, 'INTERNAL', message)
+  console.error('[plugin-canvas] unhandled error:', err)
+  return jsonError(500, 'INTERNAL', 'Internal Server Error')
 }
