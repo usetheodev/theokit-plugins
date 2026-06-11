@@ -41,8 +41,16 @@ describe("buildDevtoolsTab (P#5 T2.2)", () => {
       ownerDocument: {
         createElement: (tag: string) => {
           if (tag !== "iframe") throw new Error(`unexpected element ${tag}`);
-          const stub: { src?: string; title?: string; style: Record<string, string> } = {
+          const attrs: Record<string, string> = {};
+          const stub: {
+            src?: string; title?: string;
+            style: Record<string, string>;
+            setAttribute: (k: string, v: string) => void;
+            getAttribute: (k: string) => string | null;
+          } = {
             style: {},
+            setAttribute(k: string, v: string) { attrs[k] = v; },
+            getAttribute(k: string) { return attrs[k] ?? null; },
           };
           iframes.push(stub);
           return stub as unknown as HTMLElement;

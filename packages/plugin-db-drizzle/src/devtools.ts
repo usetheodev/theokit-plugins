@@ -42,6 +42,7 @@ export function buildDevtoolsTab(_opts: ResolvedDrizzleDbOptions): DrizzleDevtoo
     mount(container: HTMLElement): void {
       const iframe = container.ownerDocument.createElement("iframe");
       iframe.src = studioUrl;
+      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
       iframe.style.border = "0";
       iframe.style.width = "100%";
       iframe.style.height = "100%";
