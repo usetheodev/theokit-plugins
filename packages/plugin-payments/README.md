@@ -152,6 +152,10 @@ const repo = {
       throw err;
     }
   },
+  // Release the claim when the handler failed, so Stripe's retry re-runs it.
+  async delete(eventId: string): Promise<void> {
+    await db.delete(webhookEvents).where(eq(webhookEvents.eventId, eventId));
+  },
 };
 
 const plugin = payments({ idempotencyStore: createOrmStore(repo) });

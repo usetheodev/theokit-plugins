@@ -25,6 +25,16 @@ export interface IdempotencyStore {
    *          return 200 without re-running the handler).
    */
   markProcessed(eventId: string): Promise<boolean>;
+
+  /**
+   * Release a claim made by `markProcessed` when downstream processing FAILED,
+   * so a later delivery (Stripe retry) can re-claim and re-run the handler.
+   *
+   * This is what makes the dispatcher exactly-once on success AND
+   * retry-on-failure (#167): the event is claimed before dispatch and released
+   * if the handler throws. Releasing an unknown/never-claimed id is a no-op.
+   */
+  release(eventId: string): Promise<void>;
 }
 
 /**
@@ -60,6 +70,12 @@ export function createMemoryStore(): IdempotencyStore {
         inflight.delete(eventId);
       }
     },
+
+    async release(eventId: string): Promise<void> {
+      // Un-claim so a retry can re-run. No-op if it was never claimed.
+      seen.delete(eventId);
+      inflight.delete(eventId);
+    },
   };
 }
 
@@ -78,6 +94,12 @@ export interface IdempotencyRepository {
    * caught at adapter level).
    */
   insertNew(eventId: string): Promise<boolean>;
+
+  /**
+   * Delete a previously-inserted event row, releasing the claim so a retry can
+   * re-insert and re-run after a handler failure (#167). No-op if absent.
+   */
+  delete(eventId: string): Promise<void>;
 }
 
 /**
@@ -99,6 +121,9 @@ export function createOrmStore(repo: IdempotencyRepository): IdempotencyStore {
   return {
     async markProcessed(eventId: string): Promise<boolean> {
       return await repo.insertNew(eventId);
+    },
+    async release(eventId: string): Promise<void> {
+      await repo.delete(eventId);
     },
   };
 }

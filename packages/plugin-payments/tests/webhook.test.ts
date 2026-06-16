@@ -375,4 +375,76 @@ describe("processWebhook (P#6 T2.1 + T2.2 + T2.3 integration)", () => {
       expect((result.error as Error).message).toBe("DB write failed");
     }
   });
+
+  // T2.2 (#167) — a throwing handler must leave the event UNMARKED so Stripe's
+  // retry re-runs it. Before the fix, the event was marked before dispatch, so
+  // the retry deduped (duplicate) and the handler never ran again (at-most-once).
+  it("re-invokes a throwing handler on the next delivery (event left unmarked, #167)", async () => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe("sk_test_xxx", { apiVersion: "2023-10-16" });
+    const secret = "whsec_xxx";
+    const payload = JSON.stringify({
+      id: "evt_retry_after_fail",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    });
+    const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
+
+    const registry = new WebhookRegistry();
+    let invocations = 0;
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        invocations += 1;
+        throw new Error("transient DB outage");
+      }),
+    );
+    const store = createMemoryStore(); // SHARED across both deliveries
+
+    const call = () =>
+      processWebhook({ stripe, rawBody: payload, signatureHeader: header, webhookSecret: secret, registry, store });
+
+    const first = await call();
+    const second = await call(); // Stripe retry
+
+    expect(first.status).toBe("handler_error");
+    expect(second.status).toBe("handler_error"); // NOT deduped as a no-op
+    expect(invocations).toBe(2); // handler ran on BOTH deliveries (fails today: 1)
+  });
+
+  // EC-3 — multi-handler partial failure: the whole event is released on any
+  // handler throw, so a retry re-invokes the succeeded handler too. Handlers
+  // MUST therefore be idempotent (documented in defineStripeWebhook).
+  it("re-invokes an already-succeeded handler when a sibling handler throws (EC-3 at-least-once)", async () => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe("sk_test_xxx", { apiVersion: "2023-10-16" });
+    const secret = "whsec_xxx";
+    const payload = JSON.stringify({
+      id: "evt_partial_failure",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    });
+    const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
+
+    const registry = new WebhookRegistry();
+    let aInvocations = 0;
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        aInvocations += 1; // handler A — succeeds
+      }),
+    );
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler B failed"); // handler B — throws
+      }),
+    );
+    const store = createMemoryStore();
+    const call = () =>
+      processWebhook({ stripe, rawBody: payload, signatureHeader: header, webhookSecret: secret, registry, store });
+
+    await call();
+    await call(); // retry
+
+    // A re-runs on the retry (event was released) → A must be idempotent.
+    expect(aInvocations).toBe(2);
+  });
 });

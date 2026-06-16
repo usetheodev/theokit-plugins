@@ -40,6 +40,13 @@ export class StripeSignatureError extends Error {
  * ```
  *
  * Register multiple handlers with a `WebhookRegistry` instance.
+ *
+ * IDEMPOTENCY CONTRACT (EC-3): handlers MUST be idempotent. The dispatcher is
+ * exactly-once for a single successful handler, but on a multi-handler partial
+ * failure (one handler throws) OR a post-dispatch store error, the whole event
+ * is released and a Stripe retry re-invokes the already-succeeded handlers too
+ * (at-least-once). Design handlers to tolerate re-execution (e.g. upsert, not
+ * blind insert).
  */
 export function defineStripeWebhook<T extends Stripe.Event["type"]>(
   eventType: T,
@@ -188,6 +195,9 @@ export async function processWebhook(opts: {
     }
     throw err;
   }
+  // Claim the event BEFORE dispatch so duplicates and concurrent deliveries
+  // dedupe (markProcessed is atomic). The claim is COMMITTED only if dispatch
+  // succeeds; on failure it is released so Stripe's retry re-runs (#167).
   const isNew = await opts.store.markProcessed(event.id);
   if (!isNew) {
     return { status: "ok", eventId: event.id, duplicate: true };
@@ -195,6 +205,16 @@ export async function processWebhook(opts: {
   try {
     await opts.registry.dispatch(event);
   } catch (error) {
+    // #167: release the claim so the retry re-runs the handler. Best-effort —
+    // if release itself fails the claim persists (retry would dedupe); log it.
+    try {
+      await opts.store.release(event.id);
+    } catch (releaseError) {
+      console.error(
+        "[plugin-payments] failed to release idempotency claim after handler error:",
+        { eventId: event.id, releaseError },
+      );
+    }
     return { status: "handler_error", eventId: event.id, error };
   }
   return { status: "ok", eventId: event.id, duplicate: false };

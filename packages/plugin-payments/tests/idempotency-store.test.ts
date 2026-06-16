@@ -50,6 +50,21 @@ describe("createMemoryStore (P#6 T2.3)", () => {
     expect(await store.markProcessed("evt_b")).toBe(true);
     expect(await store.markProcessed("evt_c")).toBe(true);
   });
+
+  // T2.2 (#167) — release() un-claims an event so a retry can re-run it after
+  // a handler failure (exactly-once on success, retry-on-failure).
+  it("release() lets a claimed event be re-claimed (retry after failure)", async () => {
+    const store = createMemoryStore();
+    expect(await store.markProcessed("evt_rel")).toBe(true);
+    expect(await store.markProcessed("evt_rel")).toBe(false); // already claimed
+    await store.release("evt_rel");
+    expect(await store.markProcessed("evt_rel")).toBe(true); // re-claimable after release
+  });
+
+  it("release() of an unknown event id is a no-op (no throw)", async () => {
+    const store = createMemoryStore();
+    await expect(store.release("evt_never_claimed")).resolves.toBeUndefined();
+  });
 });
 
 describe("createOrmStore (P#6 T2.3)", () => {
@@ -61,6 +76,7 @@ describe("createOrmStore (P#6 T2.3)", () => {
         callCount += 1;
         return eventId === "evt_new" && callCount === 1;
       },
+      async delete() {},
     };
     const store = createOrmStore(mockRepo);
 
@@ -74,8 +90,24 @@ describe("createOrmStore (P#6 T2.3)", () => {
       async insertNew() {
         throw new Error("DB connection lost");
       },
+      async delete() {},
     };
     const store = createOrmStore(mockRepo);
     await expect(store.markProcessed("evt_x")).rejects.toThrow("DB connection lost");
+  });
+
+  it("release() delegates to repo.delete (T2.2 #167)", async () => {
+    const deleted: string[] = [];
+    const mockRepo: IdempotencyRepository = {
+      async insertNew() {
+        return true;
+      },
+      async delete(eventId: string) {
+        deleted.push(eventId);
+      },
+    };
+    const store = createOrmStore(mockRepo);
+    await store.release("evt_y");
+    expect(deleted).toEqual(["evt_y"]);
   });
 });
