@@ -146,6 +146,30 @@ describe('handleSttRequest', () => {
     })
   })
 
+  describe('upstream error body not reflected (#214)', () => {
+    it('test_upstream_error_body_not_reflected', async () => {
+      const secret = 'SENSITIVE-PROVIDER-INTERNALS-key-leak-xyz'
+      const fetchImpl = vi.fn(() =>
+        Promise.resolve(new Response(secret, { status: 500, statusText: 'Internal Server Error' })),
+      )
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      try {
+        const res = await handleSttRequest(makeBlobInput(), sttConfig, { fetchImpl })
+        expect(res.status).toBe(502) // 5xx → 502
+        const text = await res.text()
+        // Raw upstream body must NOT be reflected to the client.
+        expect(text).not.toContain(secret)
+        // A correlation id is returned to the client for support...
+        expect(text).toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+        // ...and the raw body is logged server-side (with the same id).
+        const logged = errSpy.mock.calls.flat().join(' ')
+        expect(logged).toContain(secret)
+      } finally {
+        errSpy.mockRestore()
+      }
+    })
+  })
+
   describe('timeout / abort (#211)', () => {
     it('test_stt_times_out_with_504_and_signal', async () => {
       // Deterministic: a pre-aborted client signal must surface as 504

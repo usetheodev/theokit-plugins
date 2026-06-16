@@ -12,6 +12,8 @@
  *   - Allowed voices come from the OpenAI tts-1 closed enum → 400 INVALID_VOICE.
  */
 
+import { randomUUID } from 'node:crypto'
+
 import { VoicePluginError } from './errors.js'
 import type { VoiceConfig } from './options.js'
 
@@ -145,10 +147,16 @@ export async function handleTtsRequest(
 
   if (!upstream.ok) {
     const text = await upstream.text().catch(() => '')
+    // #214: do not reflect the raw upstream body — log it server-side under a
+    // correlation id and return a generic message with the same id.
+    const correlationId = randomUUID()
+    console.error(
+      `[voice:tts] upstream ${config.provider} returned ${upstream.status} [ref ${correlationId}]: ${truncate(text, 500)}`,
+    )
     return jsonError(
       upstream.status >= 500 ? 502 : upstream.status,
       'UPSTREAM_ERROR',
-      `Upstream ${config.provider} returned ${upstream.status}: ${truncate(text, 500)}`,
+      `Upstream ${config.provider} returned an error (status ${upstream.status}). Reference: ${correlationId}`,
     )
   }
 

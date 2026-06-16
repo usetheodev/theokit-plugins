@@ -32,6 +32,7 @@
  */
 
 import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 
 import { VoiceProviderError } from './errors.js'
 import type { VoiceConfig } from './options.js'
@@ -154,10 +155,17 @@ export async function handleSttRequest(
 
   if (!upstream.ok) {
     const bodyText = await upstream.text().catch(() => '')
+    // #214: do NOT reflect the raw upstream body to the client — it can leak
+    // provider internals. Log it server-side under a correlation id and return
+    // a generic message carrying the same id so support can correlate.
+    const correlationId = randomUUID()
+    console.error(
+      `[voice:stt] upstream ${config.provider} returned ${upstream.status} [ref ${correlationId}]: ${truncate(bodyText, 500)}`,
+    )
     return jsonError(
       upstream.status >= 500 ? 502 : upstream.status,
       'UPSTREAM_ERROR',
-      `Upstream ${config.provider} returned ${upstream.status}: ${truncate(bodyText, 500)}`,
+      `Upstream ${config.provider} returned an error (status ${upstream.status}). Reference: ${correlationId}`,
     )
   }
 
