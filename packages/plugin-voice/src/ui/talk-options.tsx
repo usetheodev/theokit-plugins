@@ -5,10 +5,10 @@
  * `ChatComposer.leadingActions` (e.g. via a small toolbar wrapping both)
  * or inside a pop-over triggered from `<VoiceRecorderBar>`.
  *
- * Voice enum mirrors the server-side `VALID_VOICES` set in
- * `tts-server.ts` — keeping them in sync is a deliberate duplication
+ * Voice enum mirrors the server-side `VALID_VOICES` source of truth in
+ * `options.ts` (#215) — keeping them in sync is a deliberate duplication
  * (DRY across the network boundary loses to type safety on both ends).
- * If the server adds a voice, this enum must move first.
+ * If the server adds a voice, update `options.ts` first, then this enum.
  *
  * Speed is bounded [0.25, 4.0] per OpenAI tts-1 docs. The selector
  * exposes the four canonical multipliers users actually want (0.75,

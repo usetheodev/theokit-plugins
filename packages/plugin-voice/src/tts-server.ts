@@ -15,13 +15,17 @@
 import { randomUUID } from 'node:crypto'
 
 import { VoicePluginError } from './errors.js'
-import type { VoiceConfig } from './options.js'
+import { VALID_VOICES, type VoiceConfig } from './options.js'
 
 /** OpenAI tts-1 max input length per docs (2026-05). */
 const MAX_TEXT_CHARS = 4096
 
-/** OpenAI tts-1 closed voice enum. */
-const VALID_VOICES = new Set(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'])
+/**
+ * Per-request voice validation set, derived from the SINGLE source of truth in
+ * `options.ts` (#215). The schema validates the configured default; this guards
+ * a per-request `input.voice` override (which is an arbitrary client string).
+ */
+const VOICE_SET = new Set<string>(VALID_VOICES)
 
 const PROVIDER_URL: Record<VoiceConfig['tts']['provider'], string> = {
   openai: 'https://api.openai.com/v1/audio/speech',
@@ -80,11 +84,11 @@ export async function handleTtsRequest(
   }
 
   const voice = input.voice ?? config.voice
-  if (!VALID_VOICES.has(voice)) {
+  if (!VOICE_SET.has(voice)) {
     return jsonError(
       400,
       'INVALID_VOICE',
-      `"${voice}" is not an OpenAI tts-1 voice. Allowed: ${Array.from(VALID_VOICES).sort().join(', ')}.`,
+      `"${voice}" is not an OpenAI tts-1 voice. Allowed: ${[...VALID_VOICES].sort().join(', ')}.`,
     )
   }
 
