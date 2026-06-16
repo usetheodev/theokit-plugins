@@ -21,6 +21,7 @@ import {
   createMemoryStore,
   createOrmStore,
   magicLink,
+  MagicLinkConfigError,
   type MagicLinkRepository,
   type SendMagicLinkFn,
 } from "../src/index.js";
@@ -344,6 +345,54 @@ describe("token hashing at rest (T3.1 #191)", () => {
     });
     expect((await store.consumeToken({ token: "plain" }))?.email).toBe("a@b.co");
     expect(await store.consumeToken({ token: "plain" })).toBeNull();
+  });
+});
+
+describe("magicLink() input hardening (T3.2 #204/#209/#205)", () => {
+  const sendEmail = () => vi.fn().mockResolvedValue(undefined) as SendMagicLinkFn & ReturnType<typeof vi.fn>;
+
+  it("#204: rejects an oversized request body (DoS cap) → invalid_email", async () => {
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "https://myapp.test" });
+    // Body > 16KB with an otherwise-valid email — only the cap should reject it.
+    const body = JSON.stringify({ email: "u@x.co", pad: "a".repeat(20_000) });
+    const req = mockReq({ method: "POST", contentType: "application/json", body });
+    await expect(provider.startSignIn(req)).rejects.toMatchObject({ code: "invalid_email" });
+  });
+
+  it("#209: propagates a stream/transport error instead of swallowing it to null", async () => {
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "https://myapp.test" });
+    // A request whose body stream throws mid-read (e.g. ECONNRESET).
+    const req = {
+      url: "/api/auth/magic-link/start",
+      method: "POST",
+      headers: { host: "myapp.test", "content-type": "application/json" },
+    } as unknown as IncomingMessage;
+    (req as unknown as AsyncIterable<Buffer>)[Symbol.asyncIterator] = async function* () {
+      yield Buffer.from('{"em', "utf8");
+      throw new Error("ECONNRESET");
+    };
+    await expect(provider.startSignIn(req)).rejects.toThrow("ECONNRESET");
+  });
+
+  it("#209: still returns null (→ invalid_email) on malformed JSON (narrowed catch)", async () => {
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "https://myapp.test" });
+    const req = mockReq({ method: "POST", contentType: "application/json", body: "{bad json" });
+    await expect(provider.startSignIn(req)).rejects.toMatchObject({ code: "invalid_email" });
+  });
+
+  it("#205: builds the magic-link URL without a double slash even when base has a trailing slash", async () => {
+    const spy = sendEmail();
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: spy, callbackBaseUrl: "https://myapp.test/" });
+    await provider.startSignIn(mockReq({ url: "/api/auth/magic-link/start?email=u%40x.co" }));
+    const url = spy.mock.calls[0]![0].magicLinkUrl as string;
+    expect(url).not.toContain("//api");
+    expect(url).toMatch(/^https:\/\/myapp\.test\/api\/auth\/magic-link\/callback\?token=/);
+  });
+
+  it("#205: rejects a non-absolute callbackBaseUrl at factory init", () => {
+    expect(() =>
+      magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "not-a-url" }),
+    ).toThrow(MagicLinkConfigError);
   });
 });
 

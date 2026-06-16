@@ -31,6 +31,8 @@ const DEFAULT_LIFETIME_MS = 15 * 60 * 1000;
 const DEFAULT_CALLBACK_PATH = "/api/auth/magic-link/callback";
 const DEFAULT_CHECK_EMAIL_PAGE = "/auth/check-email";
 const TOKEN_BYTES = 32;
+// #204: hard cap on the bare-case request body we will buffer (DoS guard).
+const MAX_BODY_BYTES = 16 * 1024;
 // Minimal email guard — full RFC 5322 is overkill. Catches obvious invalids;
 // real validation happens at the auth provider (SMTP / IdP) layer.
 const EMAIL_GUARD = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -65,24 +67,35 @@ async function defaultResolveEmail(req: IncomingMessage): Promise<string | null>
   // Fall back to form-data body. Buffer raw bytes (consumer may use middleware
   // that already parsed; that's the consumer's job — we only handle the bare case).
   if (req.method === "POST" || req.method === "PUT") {
-    try {
-      const chunks: Buffer[] = [];
-      for await (const chunk of req as unknown as AsyncIterable<Buffer>) {
-        chunks.push(chunk);
+    // #204: cap the body to avoid unbounded buffering (DoS). Count bytes as we
+    // read and bail the instant we exceed the cap — never accumulate a hostile
+    // payload. The stream read is OUTSIDE any try/catch so a transport/stream
+    // error propagates instead of being swallowed to null (#209).
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of req as unknown as AsyncIterable<Buffer>) {
+      total += chunk.length;
+      if (total > MAX_BODY_BYTES) return null; // oversized → treated as invalid email
+      chunks.push(chunk);
+    }
+    const body = Buffer.concat(chunks).toString("utf8");
+    const ct = (req.headers["content-type"] ?? "").toLowerCase();
+    if (ct.includes("application/json")) {
+      // #209: narrow the catch to JSON parse errors only — malformed JSON is a
+      // client error (→ null), but a transport error must NOT be swallowed here.
+      let json: { email?: unknown };
+      try {
+        json = JSON.parse(body) as { email?: unknown };
+      } catch (err) {
+        if (err instanceof SyntaxError) return null;
+        throw err;
       }
-      const body = Buffer.concat(chunks).toString("utf8");
-      const ct = (req.headers["content-type"] ?? "").toLowerCase();
-      if (ct.includes("application/json")) {
-        const json = JSON.parse(body) as { email?: unknown };
-        return typeof json.email === "string" ? json.email.toLowerCase().trim() : null;
-      }
-      if (ct.includes("application/x-www-form-urlencoded")) {
-        const params = new URLSearchParams(body);
-        const email = params.get("email");
-        return email ? email.toLowerCase().trim() : null;
-      }
-    } catch {
-      return null;
+      return typeof json.email === "string" ? json.email.toLowerCase().trim() : null;
+    }
+    if (ct.includes("application/x-www-form-urlencoded")) {
+      const params = new URLSearchParams(body);
+      const email = params.get("email");
+      return email ? email.toLowerCase().trim() : null;
     }
   }
   return null;
@@ -116,6 +129,24 @@ export function magicLink(
   const checkPage = opts.checkEmailPage ?? DEFAULT_CHECK_EMAIL_PAGE;
   const resolveEmail = opts.resolveEmail ?? defaultResolveEmail;
 
+  // #205: validate callbackBaseUrl shape at factory init (fail fast) so a bad
+  // config surfaces at construction, not at the first sign-in request.
+  let parsedBase: URL;
+  try {
+    parsedBase = new URL(opts.callbackBaseUrl);
+  } catch {
+    throw new MagicLinkConfigError(
+      "invalid_callback_base_url",
+      `callbackBaseUrl "${opts.callbackBaseUrl}" is not an absolute URL`,
+    );
+  }
+  if (parsedBase.protocol !== "https:" && parsedBase.protocol !== "http:") {
+    throw new MagicLinkConfigError(
+      "invalid_callback_base_url",
+      `callbackBaseUrl must use http(s), got "${parsedBase.protocol}"`,
+    );
+  }
+
   return {
     name: "magic-link",
 
@@ -127,7 +158,12 @@ export function magicLink(
 
       await opts.store.createToken({ email, token, expiresAt });
 
-      const magicLinkUrl = `${opts.callbackBaseUrl}${callbackPath}?token=${encodeURIComponent(token)}`;
+      // #205: build the callback URL via the URL API so the base/path join is
+      // normalized (no double slash when the base has a trailing slash) and the
+      // token is encoded by searchParams.
+      const magicLinkUrlObj = new URL(callbackPath, opts.callbackBaseUrl);
+      magicLinkUrlObj.searchParams.set("token", token);
+      const magicLinkUrl = magicLinkUrlObj.toString();
       // EC: emit email; errors propagate (D8 invariant — never swallowed)
       await opts.sendEmail({ to: email, magicLinkUrl, expiresAt, token });
 
