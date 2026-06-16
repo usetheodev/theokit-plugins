@@ -17,6 +17,7 @@ import {
   type Presence,
   RealtimeAuthorizationError,
   RealtimeBroadcastError,
+  RealtimeError,
   type RealtimeFrame,
   RealtimePresenceError,
   type RealtimeProvider,
@@ -192,7 +193,17 @@ export class RealtimeRuntime {
       }
       case "yjs-update": {
         if (this.provider.applyYjsUpdate === undefined) {
-          // Silently drop — provider doesn't support Yjs (e.g., MemoryProvider).
+          // #197 (Rule 8): a room that declares storage:"yjs" but is wired to a
+          // provider with no Yjs support is a misconfiguration — fail loudly
+          // instead of silently dropping CRDT frames (which loses document state).
+          if (room.storage === "yjs") {
+            throw new RealtimeError(
+              `Room "${roomId}" declares storage:"yjs" but provider "${this.provider.name}" does not implement applyYjsUpdate. ` +
+                "Use a Yjs-capable provider (createYjsRealtimeProvider) or remove storage:\"yjs\".",
+              { code: "yjs_provider_unsupported" },
+            );
+          }
+          // Non-yjs room with no provider support: nothing is expected — drop.
           return;
         }
         await this.provider.applyYjsUpdate(roomId, connectionId, frame.bytes);
@@ -200,6 +211,14 @@ export class RealtimeRuntime {
       }
       case "yjs-awareness": {
         if (this.provider.applyYjsAwareness === undefined) {
+          // #197: same misconfiguration guard as yjs-update.
+          if (room.storage === "yjs") {
+            throw new RealtimeError(
+              `Room "${roomId}" declares storage:"yjs" but provider "${this.provider.name}" does not implement applyYjsAwareness. ` +
+                "Use a Yjs-capable provider (createYjsRealtimeProvider) or remove storage:\"yjs\".",
+              { code: "yjs_provider_unsupported" },
+            );
+          }
           return;
         }
         await this.provider.applyYjsAwareness(roomId, connectionId, frame.bytes);
