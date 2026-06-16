@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Security
 
+- auth-magic-link: magic-link tokens are now hashed (SHA-256) at rest in the built-in memory and ORM stores, so a store/DB/log leak no longer exposes live credentials (#191). Also documents that magic-link tokens are intentionally unbound bearer credentials — cross-device by design — relying on token entropy + short TTL + single-use + hash-at-rest rather than OAuth `tx.state` binding (#190; supersedes plan ADR D6)
 - plugin-canvas: enforce artifact security on the REST `POST /artifacts` route — script-bearing SVG and meta-refresh HTML are now rejected with 400 before persistence, closing a stored-XSS bypass that previously only guarded the agent-tool path (#176)
 - plugin-canvas: the artifact security gate now also covers `image` (`data:image/svg+xml`), `mermaid`, and `slide-deck` kinds — SVG data URLs are decoded and sanitized (malformed base64 rejected cleanly), and mermaid/slide-deck sources are scanned for script vectors (#178)
 - plugin-canvas: the mermaid renderer now sanitizes the rendered SVG (DOMPurify) before injecting it into the DOM, adding defense-in-depth on top of mermaid's `securityLevel:'strict'` (#177)

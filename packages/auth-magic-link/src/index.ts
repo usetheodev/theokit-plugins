@@ -141,6 +141,21 @@ export function magicLink(
       );
     },
 
+    /**
+     * #190 (documented-bearer model): magic-link tokens are INTENTIONALLY
+     * unbound bearer credentials — `_tx` (the OAuth cookie-state transaction) is
+     * deliberately NOT validated here. Unlike github/google, magic-link has no
+     * redirect round-trip and is cross-device by design (the user may click the
+     * email link on a different device than the one that called `startSignIn`, so
+     * no initiating-browser `tx.state` cookie is present). Binding to `tx.state`
+     * would break that core feature, and an "optional" binding is security
+     * theatre (an attacker simply omits the cookie). Security rests instead on:
+     * 32-byte token entropy, a short TTL (15 min default), atomic single-use
+     * consumption, and hash-at-rest (#191). NOTE: this supersedes the plan's
+     * ADR D6 binding option, whose rejection of the bearer model was based on a
+     * false premise (magic-link throws in `createAuthorizationURL` and has no
+     * tx-producing issuance path). See CHANGELOG / changeset for the correction.
+     */
     async handleCallback(
       req: IncomingMessage,
       _tx: OAuthTransaction,
