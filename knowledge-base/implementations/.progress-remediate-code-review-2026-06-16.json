@@ -241,6 +241,56 @@
     "commit"
    ],
    "note": "SEPA pre-COMMIT unavailable (500 x2) -> self-review performed (low-risk validate-then-narrow guard)"
+  },
+  {
+   "id": "T3.1",
+   "task_id": "T3.1",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "88fbb04",
+   "files": [
+    "packages/auth-magic-link/src/store.ts",
+    "packages/auth-magic-link/src/index.ts",
+    "packages/auth-magic-link/tests/magic-link.test.ts",
+    ".changeset/auth-magic-link-store-schema.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#191 sha256 hash-at-rest both adapters; #190 owner-approved documented-bearer (supersedes ADR D6 false premise)"
+  },
+  {
+   "id": "T3.2",
+   "task_id": "T3.2",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "70eb7a4",
+   "files": [
+    "packages/auth-magic-link/src/index.ts",
+    "packages/auth-magic-link/tests/magic-link.test.ts",
+    ".changeset/auth-magic-link-input-hardening.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ]
   }
  ]
 }
