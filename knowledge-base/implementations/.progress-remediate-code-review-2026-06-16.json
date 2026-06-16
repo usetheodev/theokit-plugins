@@ -291,6 +291,56 @@
     "wiring",
     "commit"
    ]
+  },
+  {
+   "id": "T3.3",
+   "task_id": "T3.3",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "340b78d",
+   "files": [
+    "packages/auth-google/src/index.ts",
+    "packages/auth-google/tests/google-provider.test.ts",
+    ".changeset/auth-google-oidc-ssrf-hardening.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#192 SSRF: https-or-loopback gate on base + 3 discovered endpoints; env override loopback-only. Deviates from finding sub-fix (c) host-equality (breaks Google multi-host) -> documented. SEPA pre-RED/post-GREEN/pre-COMMIT all GO."
+  },
+  {
+   "id": "T3.4",
+   "task_id": "T3.4",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "647a6c3",
+   "files": [
+    "packages/auth-github/src/index.ts",
+    "packages/auth-github/tests/github-provider.test.ts",
+    ".changeset/auth-github-emails-failure-surfaced.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#203 fail-loud: emails fetch failure -> GitHubAuthError(emails_fetch_failed); no-verified-email stays null (documented distinction). SEPA pre-COMMIT GO."
   }
  ]
 }
