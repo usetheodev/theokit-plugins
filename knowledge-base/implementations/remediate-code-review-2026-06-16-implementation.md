@@ -23,19 +23,19 @@ Per-task detail (Files to edit, TDD, Acceptance, Concurrency tests, Failure scen
 | T1.3 | Phase 1 | Sanitize mermaid SVG before `dangerouslySetInnerHTML` (#177, test #231) | committed | ✓ | defer | n/a | 9aad2a1 |
 | T1.4 | Phase 1 | DOMPurify-driven verdict + remove post-sanitize regex (#180, #179) | committed | ✓ | defer | n/a | 01c1e9e |
 | T1.5 | Phase 1 | Remove pointless try/catch in `define-artifact-tool` (#181) | committed | ✓ | defer | n/a | 5a06898 |
-| T2.1 | Phase 2 | Code-keyed zero-decimal detection + integer-exact conversion (#200, #199, test #225) | pending | — | — | — | — |
-| T2.2 | Phase 2 | Mark webhook processed only after successful dispatch (#167, test #226) | pending | — | — | — | — |
-| T2.3 | Phase 2 | Aggregate handler errors + sanitize the public error (#208, #201) | pending | — | — | — | — |
-| T2.4 | Phase 2 | Make the memory idempotency store loud in production (#202) | pending | — | — | — | — |
-| T2.5 | Phase 2 | Validate Stripe `apiVersion` instead of blind cast (#210) | pending | — | — | — | — |
-| T3.1 | Phase 3 | Magic-link CSRF binding + token hashing (#190, #191) | pending | — | — | — | — |
-| T3.2 | Phase 3 | Magic-link body cap + narrowed catch + URL join (#204, #209, #205) | pending | — | — | — | — |
-| T3.3 | Phase 3 | Google OIDC base-URL SSRF gating (#192) | pending | — | — | — | — |
-| T3.4 | Phase 3 | GitHub provider: surface `/user/emails` failure (#203) | pending | — | — | — | — |
-| T4.1 | Phase 4 | `ensureYjs` in-flight memoization + return bundle (#193, #196, test #234) | pending | — | — | — | — |
-| T4.2 | Phase 4 | Guard `applyYjsUpdate` against destroyed/GC'd docs (#194) | pending | — | — | — | — |
-| T4.3 | Phase 4 | server-integration: abort handling + bounded queue (#195, #198, test #235) | pending | — | — | — | — |
-| T4.4 | Phase 4 | Fail loudly when a yjs-storage room lacks provider support (#197) | pending | — | — | — | — |
+| T2.1 | Phase 2 | Code-keyed zero-decimal detection + integer-exact conversion (#200, #199, test #225) | committed | ✓ | defer | n/a | b074718 |
+| T2.2 | Phase 2 | Mark webhook processed only after successful dispatch (#167, test #226) | committed | ✓ | defer | n/a | 0756375 |
+| T2.3 | Phase 2 | Aggregate handler errors + sanitize the public error (#208, #201) | committed | ✓ | defer | n/a | 7baea9d |
+| T2.4 | Phase 2 | Make the memory idempotency store loud in production (#202) | committed | ✓ | defer | n/a | aa87e8c |
+| T2.5 | Phase 2 | Validate Stripe `apiVersion` instead of blind cast (#210) | committed | ✓ | defer | n/a | 2f53469 |
+| T3.1 | Phase 3 | Magic-link CSRF binding + token hashing (#190, #191) | committed | ✓ | defer | n/a | 88fbb04 |
+| T3.2 | Phase 3 | Magic-link body cap + narrowed catch + URL join (#204, #209, #205) | committed | ✓ | defer | n/a | 70eb7a4 |
+| T3.3 | Phase 3 | Google OIDC base-URL SSRF gating (#192) | committed | ✓ | defer | n/a | 340b78d |
+| T3.4 | Phase 3 | GitHub provider: surface `/user/emails` failure (#203) | committed | ✓ | defer | n/a | 647a6c3 |
+| T4.1 | Phase 4 | `ensureYjs` in-flight memoization + return bundle (#193, #196, test #234) | committed | ✓ | defer | n/a | 962b42e |
+| T4.2 | Phase 4 | Guard `applyYjsUpdate` against destroyed/GC'd docs (#194) | committed | ✓ | defer | n/a | be6ec38 |
+| T4.3 | Phase 4 | server-integration: abort handling + bounded queue (#195, #198, test #235) | committed | ✓ | defer | n/a | 3e7af67 |
+| T4.4 | Phase 4 | Fail loudly when a yjs-storage room lacks provider support (#197) | committed | ✓ | defer | n/a | ca041df |
 | T5.1 | Phase 5 | STT/TTS upstream timeout/abort (#211, #212, test #236) | pending | — | — | — | — |
 | T5.2 | Phase 5 | Recorder: release stream + surface error on recording error (#213, test #237) | pending | — | — | — | — |
 | T5.3 | Phase 5 | Don't reflect upstream error bodies (#214) | pending | — | — | — | — |
@@ -68,3 +68,11 @@ Status legend: pending / red / green / refactor / wired / committed / blocked.
 ## Pre-existing condition (logged, not introduced by this plan)
 
 - `pnpm typecheck` (root `tsc --noEmit`) reports **40 pre-existing errors** at baseline commit db04cb9 (in `packages/plugin-canvas/src/ui/renderers/markdown.tsx` and `packages/plugin-canvas/tests/use-canvas.test.tsx`), unrelated to the 72 findings. Verified via `git stash` before any task. These will surface at the Step 5 validation gate; they are documented here per cycle-implement.md "pre-existing issues are logged but do NOT block plan completion."
+
+## Deviations log (plan vs. implementation — material, SEPA-vetted)
+
+Per cycle-implement.md, deviations from the plan are logged, not silently absorbed. Each below was caught by SEPA and is documented at its code/test site + CHANGELOG/changeset.
+
+- **T3.1 (#190)** — the plan's ADR D6 prescribed binding magic-link callbacks to `tx.state`. Owner-approved deviation to the **documented-bearer model**: magic-link is cross-device by design (no initiating-browser cookie), so `tx.state` binding would break the core feature and an optional binding is security theatre. D6's rejection of the bearer model rested on a false premise (magic-link throws in `createAuthorizationURL`, has no tx-producing issuance path). Security rests on 32-byte entropy + short TTL + single-use + hash-at-rest. Documented in code comment + CHANGELOG + changeset.
+- **T3.3 (#192)** — the finding's sub-fix (c) prescribed "validate discovered endpoint hosts against the configured base host". Rejected: real Google discovery spans `accounts.google.com` / `oauth2.googleapis.com` / `openidconnect.googleapis.com`, so strict host-equality would break production. Replaced by **https-except-loopback** on the base + all 3 discovered endpoints, which closes the same plaintext-exfil vector without the multi-host breakage. The "build-time flag" sub-fix (a) — impractical in a published JS lib — was replaced by a **loopback-only restriction** on the env override. Documented in code comment + test header + CHANGELOG + changeset.
+- **T4.1 (#193)** — the plan's RED prescribed concurrent `joinRoom`, but `joinRoom` never calls `ensureYjs` (presence-only) so it constructs zero `Y.Doc`s and cannot reproduce the race (the prescribed RED would be born-GREEN). The RED instead uses concurrent **`applyYjsUpdate`** (the only path that reaches `ensureYjs`), asserting exactly one `Y.Doc` is constructed via a `vi.mock`'d Doc-constructor counter. The GC-during-init orphan window is deferred to T4.2/#194 (TODO in code). Documented in test header + changeset.

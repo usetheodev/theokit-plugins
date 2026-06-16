@@ -341,6 +341,106 @@
     "commit"
    ],
    "note": "#203 fail-loud: emails fetch failure -> GitHubAuthError(emails_fetch_failed); no-verified-email stays null (documented distinction). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T4.1",
+   "task_id": "T4.1",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "962b42e",
+   "files": [
+    "packages/plugin-realtime/src/yjs-provider.ts",
+    "packages/plugin-realtime/tests/yjs-provider-concurrency.test.ts",
+    ".changeset/realtime-yjs-doc-race.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#193 single-flight memo (state.docInit ??=) closes check-then-act race; docInit is single source of truth (dropped doc/awareness fast-path fields); #196 redundant loadYjs removed via bundle. DEVIATION: plan RED prescribed concurrent joinRoom but joinRoom never calls ensureYjs (born-GREEN) -> RED uses concurrent applyYjsUpdate (vi.mock Doc ctor count). GC-during-init orphan deferred to T4.2/#194 (TODO in code). SEPA pre-RED/post-GREEN/pre-COMMIT all GO."
+  },
+  {
+   "id": "T4.2",
+   "task_id": "T4.2",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "be6ec38",
+   "files": [
+    "packages/plugin-realtime/src/yjs-provider.ts",
+    "packages/plugin-realtime/tests/yjs-provider-concurrency.test.ts",
+    ".changeset/realtime-yjs-destroyed-doc-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#194 in-flight refcount defers gcIfEmpty (destroy+evict) while applies run; post-await membership re-check + factory destroy-if-evicted belt. Closes apply-to-destroyed-doc AND the T4.1-deferred GC-during-init orphan in one mechanism. TODO :176-178 removed. SEPA pre-RED/post-GREEN/pre-COMMIT all GO (RED empirically verified failing vs HEAD)."
+  },
+  {
+   "id": "T4.3",
+   "task_id": "T4.3",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "3e7af67",
+   "files": [
+    "packages/plugin-realtime/src/internal/server-integration.ts",
+    "packages/plugin-realtime/tests/server-integration.test.ts",
+    ".changeset/realtime-server-abort-bounded-queue.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#195 abort listener registered before handleConnection await + entry aborted-guard + removeEventListener on catch+finally (no handle/listener leak); bounded queue MAX_QUEUED_FRAMES=1024 -> disconnect(1013) on overflow. #198 onFrame stopped-guard drops post-abort/post-overflow frames. NEW test file (3 tests; 2 RED + 1 honest regression guard). SEPA post-GREEN/pre-COMMIT GO."
+  },
+  {
+   "id": "T4.4",
+   "task_id": "T4.4",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "ca041df",
+   "files": [
+    "packages/plugin-realtime/src/internal/runtime.ts",
+    "packages/plugin-realtime/tests/runtime.test.ts",
+    ".changeset/realtime-yjs-room-misconfig-loud.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#197 fail-loud: storage:'yjs' room + provider without applyYjsUpdate/applyYjsAwareness -> RealtimeError(yjs_provider_unsupported) instead of silent drop. Non-yjs rooms unchanged (existing no-op test green). SEPA pre-COMMIT GO."
   }
  ]
 }
