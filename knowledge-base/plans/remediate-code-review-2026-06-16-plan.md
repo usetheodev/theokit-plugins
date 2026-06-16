@@ -303,9 +303,9 @@ function create(req):
 
 #### TDD
 ```
-RED:  create_rejects_script_bearing_svg() — POST svg w/ <script> → 4xx security code (fails today)
-RED:  create_rejects_meta_refresh_html()  — POST html w/ meta-refresh → 4xx
-RED:  create_accepts_benign_code_artifact() — POST code → 201 (guards against over-blocking)
+RED:  test_create_rejects_script_bearing_svg() — POST svg w/ <script> → 4xx security code (fails today)
+RED:  test_create_rejects_meta_refresh_html()  — POST html w/ meta-refresh → 4xx
+RED:  test_create_accepts_benign_code_artifact() — POST code → 201 (guards against over-blocking)
 GREEN: wire enforceArtifactSecurity + 400 mapping in create()
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-canvas test
@@ -356,9 +356,9 @@ packages/plugin-canvas/tests/schema.test.ts — RED cases for each new kind
 
 #### TDD
 ```
-RED: enforce_rejects_svg_data_url_with_script()
-RED: enforce_rejects_mermaid_with_script_vector()
-RED: enforce_handles_slide_deck_embedded_handler()
+RED: test_enforce_rejects_svg_data_url_with_script()
+RED: test_enforce_rejects_mermaid_with_script_vector()
+RED: test_enforce_handles_slide_deck_embedded_handler()
 GREEN: extend enforceArtifactSecurity
 REFACTOR: keep per-kind logic in small helpers (feeds D9)
 VERIFY: pnpm --filter @theokit/plugin-canvas test
@@ -406,7 +406,7 @@ packages/plugin-canvas/tests/artifact-renderer.test.tsx — RED: mermaid produci
 
 #### TDD
 ```
-RED: mermaid_render_strips_script_svg()
+RED: test_mermaid_render_strips_script_svg()
 GREEN: apply sanitizeSvg before dangerouslySetInnerHTML
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-canvas test
@@ -455,8 +455,8 @@ packages/plugin-canvas/tests/schema.test.ts (and/or sanitize-specific test) — 
 
 #### TDD
 ```
-RED: verdict_rejects_when_dompurify_removes_script_attr()
-RED: benign_markup_passes_without_mutation()
+RED: test_verdict_rejects_when_dompurify_removes_script_attr()
+RED: test_benign_markup_passes_without_mutation()
 GREEN: removed[]-driven verdict + URI policy; delete regex pass
 REFACTOR: extract classifyRemovals helpers (sets up #186 in Phase 9)
 VERIFY: pnpm --filter @theokit/plugin-canvas test
@@ -503,7 +503,7 @@ packages/plugin-canvas/src/define-artifact-tool.ts — remove try/catch; direct 
 
 #### TDD
 ```
-RED: (characterization) define_artifact_tool_propagates_security_error() — exists/added, stays green
+RED: test_define_artifact_tool_propagates_security_error() — (characterization)  — exists/added, stays green
 GREEN: remove try/catch
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-canvas test
@@ -570,10 +570,10 @@ function formatAmountForStripe(amount, currency) -> integer:
 
 #### TDD
 ```
-RED: usd_whole_number_is_major_units_x100()   // 10 -> 1000 (fails today: 100x undercharge)
-RED: usd_fractional_exact()                    // 99.99 -> 9999
-RED: jpy_zero_decimal_passthrough_integer()    // 100 -> 100
-RED: jpy_non_integer_throws()
+RED: test_usd_whole_number_is_major_units_x100()   // 10 -> 1000 (fails today: 100x undercharge)
+RED: test_usd_fractional_exact()                    // 99.99 -> 9999
+RED: test_jpy_zero_decimal_passthrough_integer()    // 100 -> 100
+RED: test_jpy_non_integer_throws()
 GREEN: code-keyed detection + integer-exact conversion
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-payments test
@@ -622,9 +622,9 @@ packages/plugin-payments/tests/webhook.test.ts — RED: throwing handler invoked
 
 #### TDD
 ```
-RED: throwing_handler_leaves_event_unmarked_and_retried()
-RED: successful_handler_marks_once_and_dedupes()
-RED: partial_failure_documents_handler_idempotency_requirement()  -- EC-3: A ok + B throws → retry re-runs; assert idempotency contract / per-handler effect
+RED: test_throwing_handler_leaves_event_unmarked_and_retried()
+RED: test_successful_handler_marks_once_and_dedupes()
+RED: test_partial_failure_documents_handler_idempotency_requirement()  -- EC-3: A ok + B throws → retry re-runs; assert idempotency contract / per-handler effect
 GREEN: mark-after-success ordering + failure status
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-payments test
@@ -675,8 +675,8 @@ packages/plugin-payments/tests/webhook.test.ts — RED: multi-error aggregation;
 
 #### TDD
 ```
-RED: dispatch_surfaces_all_handler_errors()
-RED: webhook_result_error_is_sanitized()
+RED: test_dispatch_surfaces_all_handler_errors()
+RED: test_webhook_result_error_is_sanitized()
 GREEN: AggregateError + sanitized {code,message}
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-payments test
@@ -727,7 +727,7 @@ packages/plugin-payments/tests/webhook.test.ts (or new) — RED: production + de
 
 #### TDD
 ```
-RED: production_default_idempotency_store_is_loud()
+RED: test_production_default_idempotency_store_is_loud()
 GREEN: register-time guard
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-payments test
@@ -774,7 +774,7 @@ packages/plugin-payments/tests/checkout.test.ts (or stripe-client test) — RED:
 
 #### TDD
 ```
-RED: invalid_api_version_rejected()
+RED: test_invalid_api_version_rejected()
 GREEN: validate/narrow apiVersion
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-payments test
@@ -830,9 +830,9 @@ packages/auth-magic-link/tests/*.test.ts — RED: state mismatch rejected; RED: 
 
 #### TDD
 ```
-RED: callback_rejects_state_mismatch()
-RED: store_persists_only_token_hash()
-RED: valid_state_single_use_consume_succeeds()
+RED: test_callback_rejects_state_mismatch()
+RED: test_store_persists_only_token_hash()
+RED: test_valid_state_single_use_consume_succeeds()
 GREEN: bind+validate state; hash at rest
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/auth-magic-link test
@@ -882,9 +882,9 @@ packages/auth-magic-link/tests/*.test.ts — RED for each
 
 #### TDD
 ```
-RED: resolve_email_rejects_oversized_body()
-RED: resolve_email_propagates_transport_error()
-RED: signin_url_uses_resolved_callback_path()
+RED: test_resolve_email_rejects_oversized_body()
+RED: test_resolve_email_propagates_transport_error()
+RED: test_signin_url_uses_resolved_callback_path()
 GREEN: implement all three
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/auth-magic-link test
@@ -931,9 +931,9 @@ packages/auth-google/tests/*.test.ts — RED: non-https rejected; RED: cross-hos
 
 #### TDD
 ```
-RED: non_https_oidc_base_rejected()
-RED: cross_host_discovery_rejected()
-RED: production_ignores_env_override()
+RED: test_non_https_oidc_base_rejected()
+RED: test_cross_host_discovery_rejected()
+RED: test_production_ignores_env_override()
 GREEN: implement gating/validation
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/auth-google test
@@ -980,7 +980,7 @@ packages/auth-github/tests/*.test.ts — RED: emails failure surfaced
 
 #### TDD
 ```
-RED: github_emails_failure_is_surfaced()
+RED: test_github_emails_failure_is_surfaced()
 GREEN: handle non-ok emails response
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/auth-github test
@@ -1034,8 +1034,8 @@ packages/plugin-realtime/tests/yjs-provider.test.ts — RED: concurrent join sha
 
 #### TDD
 ```
-RED: concurrent_join_shares_single_ydoc()
-RED: failed_doc_init_clears_memo_and_allows_retry()  -- EC-1: if loadYjs() rejects, state.docInit is reset so a later join can recreate (no permanently bricked room)
+RED: test_concurrent_join_shares_single_ydoc()
+RED: test_failed_doc_init_clears_memo_and_allows_retry()  -- EC-1: if loadYjs() rejects, state.docInit is reset so a later join can recreate (no permanently bricked room)
 GREEN: in-flight promise + synchronous assign + return bundle; on reject `catch (e){ state.docInit = undefined; throw e }`
 REFACTOR: remove redundant loadYjs callers
 VERIFY: pnpm --filter @theokit/plugin-realtime test
@@ -1085,7 +1085,7 @@ packages/plugin-realtime/tests/yjs-provider.test.ts — RED: apply after leave/G
 
 #### TDD
 ```
-RED: apply_after_gc_is_safe_noop()
+RED: test_apply_after_gc_is_safe_noop()
 GREEN: post-await guard + in-flight refcount
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-realtime test
@@ -1135,9 +1135,9 @@ packages/plugin-realtime/tests/server-integration.test.ts (NEW) — RED: abort r
 
 #### TDD
 ```
-RED: abort_releases_connection_handle()
-RED: onframe_stops_after_abort()
-RED: queue_is_bounded_under_flood()
+RED: test_abort_releases_connection_handle()
+RED: test_onframe_stops_after_abort()
+RED: test_queue_is_bounded_under_flood()
 GREEN: pre-await abort check + stopped guard + cap
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-realtime test
@@ -1185,7 +1185,7 @@ packages/plugin-realtime/tests/*.test.ts — RED: misconfig surfaces
 
 #### TDD
 ```
-RED: yjs_room_without_provider_support_errors()
+RED: test_yjs_room_without_provider_support_errors()
 GREEN: config check at mount/dispatch
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-realtime test
@@ -1239,8 +1239,8 @@ packages/plugin-voice/tests/stt-server.test.ts — RED: never-resolving fetch �
 
 #### TDD
 ```
-RED: stt_times_out_with_504_and_signal()
-RED: tts_times_out_and_cancels_stream_on_abort()
+RED: test_stt_times_out_with_504_and_signal()
+RED: test_tts_times_out_and_cancels_stream_on_abort()
 GREEN: AbortSignal.timeout + client-abort wiring + 504
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-voice test
@@ -1290,7 +1290,7 @@ packages/plugin-voice/tests/recorder.test.ts — RED: error during recording rel
 
 #### TDD
 ```
-RED: recording_error_releases_stream_and_surfaces()
+RED: test_recording_error_releases_stream_and_surfaces()
 GREEN: always releaseStream + onError on error
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-voice test
@@ -1338,7 +1338,7 @@ packages/plugin-voice/tests/stt-server.test.ts — RED: upstream error body not 
 
 #### TDD
 ```
-RED: upstream_error_body_not_reflected()
+RED: test_upstream_error_body_not_reflected()
 GREEN: generic message + correlation id + server log
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-voice test
@@ -1386,7 +1386,7 @@ packages/plugin-voice/tests/*.test.ts — RED: invalid default voice rejected
 
 #### TDD
 ```
-RED: invalid_default_voice_rejected_at_construction()
+RED: test_invalid_default_voice_rejected_at_construction()
 GREEN: single z.enum imported both ends
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-voice test
@@ -1433,7 +1433,7 @@ packages/plugin-voice/tests/use-tts.test.tsx — RED: speak(A) then speak(B), re
 
 #### TDD
 ```
-RED: stale_play_does_not_override_newer_speak()
+RED: test_stale_play_does_not_override_newer_speak()
 GREEN: per-call controller identity check
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-voice test
@@ -1482,7 +1482,7 @@ packages/plugin-voice/tests/*.test.tsx — RED: malformed response → specific 
 
 #### TDD
 ```
-RED: malformed_stt_response_surfaces_specific_error()
+RED: test_malformed_stt_response_surfaces_specific_error()
 GREEN: try/catch + typed error
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-voice test
@@ -1526,7 +1526,7 @@ packages/plugin-voice/src/index.ts — correct docstring
 
 #### TDD
 ```
-RED: (none — doc-only; covered by typecheck that exports compile)
+RED: test_none_doc_only_covered_by_typecheck_that_exports_() — (none — doc-only; covered by typecheck that exports compile)
 GREEN: edit docstring
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-voice typecheck
@@ -1579,7 +1579,7 @@ packages/plugin-copilot/tests/runtime.test.ts — RED: malicious payload stays r
 
 #### TDD
 ```
-RED: untrusted_text_is_role_isolated()
+RED: test_untrusted_text_is_role_isolated()
 GREEN: user-role message + framing
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-copilot test
@@ -1629,9 +1629,9 @@ packages/plugin-copilot/tests/runtime.test.ts — RED: idle+broadcast concurrent
 
 #### TDD
 ```
-RED: idle_and_broadcast_do_not_double_spend()
-RED: idle_runagent_blocked_after_deactivate()
-RED: reservation_released_when_runagent_throws()  -- EC-2: a failed invocation does not leak reserved budget (finally releases)
+RED: test_idle_and_broadcast_do_not_double_spend()
+RED: test_idle_runagent_blocked_after_deactivate()
+RED: test_reservation_released_when_runagent_throws()  -- EC-2: a failed invocation does not leak reserved budget (finally releases)
 GREEN: single queue + atomic reserve/reconcile + deactivate await/guard; release reservation in finally
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-copilot test
@@ -1679,7 +1679,7 @@ packages/plugin-copilot/tests/runtime.test.ts — RED: handler error is logged w
 
 #### TDD
 ```
-RED: handleframe_error_logged_with_context()
+RED: test_handleframe_error_logged_with_context()
 GREEN: contextual log in catch
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-copilot test
@@ -1726,7 +1726,7 @@ packages/plugin-copilot/tests/runtime.test.ts — RED: round-robin advances per 
 
 #### TDD
 ```
-RED: round_robin_keyed_by_room()
+RED: test_round_robin_keyed_by_room()
 GREEN: cursor by room id
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-copilot test
@@ -1775,7 +1775,7 @@ packages/plugin-copilot/tests/runtime.test.ts — RED: non-conforming completion
 
 #### TDD
 ```
-RED: non_conforming_completion_rejected()
+RED: test_non_conforming_completion_rejected()
 GREEN: real z.object schema
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-copilot test
@@ -1822,7 +1822,7 @@ packages/plugin-copilot/tests/runtime.test.ts — RED: getUsage reflects actual,
 
 #### TDD
 ```
-RED: getusage_reflects_actual_cost()
+RED: test_getusage_reflects_actual_cost()
 GREEN: reconcile actual on completion
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-copilot test
@@ -1873,7 +1873,7 @@ packages/plugin-copilot/tests/*.test.tsx — RED: a test mirrors the README Quic
 
 #### TDD
 ```
-RED: documented_quickstart_compiles_and_works()
+RED: test_documented_quickstart_compiles_and_works()
 GREEN: reconcile README/code
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-copilot test && pnpm --filter @theokit/plugin-copilot typecheck
@@ -1926,7 +1926,7 @@ packages/plugin-db-drizzle/tests/*.test.ts — RED: reset without --force refuse
 
 #### TDD
 ```
-RED: reset_requires_force()
+RED: test_reset_requires_force()
 GREEN: --force guard
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-db-drizzle test
@@ -1973,7 +1973,7 @@ packages/plugin-db-drizzle/tests/*.test.ts — RED: args include connection opts
 
 #### TDD
 ```
-RED: connection_opts_forwarded_to_drizzle_kit()
+RED: test_connection_opts_forwarded_to_drizzle_kit()
 GREEN: forward driver/url/dialect
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-db-drizzle test
@@ -2020,7 +2020,7 @@ packages/plugin-db-drizzle/tests/*.test.ts — RED: seed invokes the configured 
 
 #### TDD
 ```
-RED: seed_runs_user_script()
+RED: test_seed_runs_user_script()
 GREEN: route seed to user script
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-db-drizzle test
@@ -2067,7 +2067,7 @@ packages/plugin-db-drizzle/tests/*.test.ts — RED: conflict path differs
 
 #### TDD
 ```
-RED: cli_conflict_guard_is_effective()
+RED: test_cli_conflict_guard_is_effective()
 GREEN: differentiate branches
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-db-drizzle test
@@ -2114,8 +2114,8 @@ packages/plugin-db-drizzle/tests/*.test.ts — RED: sandbox lacks same-origin+sc
 
 #### TDD
 ```
-RED: iframe_sandbox_is_safe()
-RED: studio_url_from_resolved_options()
+RED: test_iframe_sandbox_is_safe()
+RED: test_studio_url_from_resolved_options()
 GREEN: fix sandbox + plumb url
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-db-drizzle test
@@ -2167,8 +2167,8 @@ packages/plugin-email/tests/render-react-email.test.ts — happy-path + decouple
 
 #### TDD
 ```
-RED: render_react_email_happy_path()
-RED: render_react_email_missing_dep_mocked()
+RED: test_render_react_email_happy_path()
+RED: test_render_react_email_missing_dep_mocked()
 GREEN: tests pass against real renderReactEmail
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-email test
@@ -2215,7 +2215,7 @@ packages/plugin-forms/src/... — (only if extracting handleValid to a pure expo
 
 #### TDD
 ```
-RED: theoform_routes_field_errors_and_rethrows()
+RED: test_theoform_routes_field_errors_and_rethrows()
 GREEN: test the real component/extracted fn
 REFACTOR: None expected
 VERIFY: pnpm --filter @theokit/plugin-forms test
@@ -2277,7 +2277,7 @@ packages/plugin-voice/src/tts-server.ts — extract helpers in handleTtsRequest(
 
 #### TDD
 ```
-RED:  (characterization where missing) e.g. store_behaves_as_before(), serialize_copy_snapshot()
+RED:  test_store_behaves_as_before() — (characterization where missing) e.g. , serialize_copy_snapshot()
 GREEN: extract helpers; all existing + characterization tests stay green
 REFACTOR: this task IS the refactor — verify no behavior change
 VERIFY: pnpm -r test  &&  lizard packages -l typescript (CC of the 8 functions ≤ 10 or documented)
