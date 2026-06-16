@@ -290,4 +290,45 @@ describe('T3.4 — VoiceRecorderBar', () => {
     await waitFor(() => expect(screen.getByTestId('custom-alert')).toBeTruthy())
     expect(screen.queryByTestId('voice-alert')).toBeNull()
   })
+
+  it('test_malformed_stt_response_surfaces_specific_error (#217)', async () => {
+    const rec = fakeRecorder()
+    // 200 OK but the body is NOT valid JSON — res.json() throws opaquely.
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(
+        new Response('<<not json>>', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+    const onError = vi.fn()
+    render(
+      <VoiceRecorderBar
+        onTranscript={() => undefined}
+        onError={onError}
+        recorderFactory={() => rec}
+        fetchImpl={fetchImpl as unknown as typeof fetch}
+      />,
+    )
+    const btn = screen.getByTestId('voice-recorder-button')
+    await act(async () => {
+      fireEvent.click(btn)
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(btn.getAttribute('data-phase')).toBe('recording'))
+    await act(async () => {
+      fireEvent.click(btn)
+      await Promise.resolve()
+    })
+    await act(async () => {
+      rec.resolveStop(new Blob([new Uint8Array([1])], { type: 'audio/webm' }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(onError).toHaveBeenCalled())
+    const err = onError.mock.calls[0]![0] as Error
+    expect(err).toBeInstanceOf(VoicePluginError)
+    expect(String(err.message)).toMatch(/invalid stt response/i)
+  })
 })

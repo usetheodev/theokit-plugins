@@ -164,10 +164,20 @@ export function VoiceRecorderBar({
           `STT endpoint returned ${res.status}: ${text.slice(0, 200)}`,
         )
       }
-      const data = (await res.json()) as {
-        transcript?: string
-        language?: string
-        durationMs?: number
+      // #217: a 200 response with a malformed body would otherwise throw an
+      // opaque SyntaxError. Guard res.json() and surface a specific error.
+      let data: { transcript?: string; language?: string; durationMs?: number }
+      try {
+        data = (await res.json()) as {
+          transcript?: string
+          language?: string
+          durationMs?: number
+        }
+      } catch (parseErr) {
+        throw new VoicePluginError(
+          'Invalid STT response: the server returned a body that is not valid JSON.',
+          { cause: parseErr },
+        )
       }
       const transcript = data.transcript ?? ''
       const meta: { language?: string; durationMs: number } = {
