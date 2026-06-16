@@ -131,6 +131,43 @@ describe("github() — handleCallback", () => {
     expect(result.profile.email).toBe("primary@test.com");
   });
 
+  it("test_github_emails_failure_is_surfaced", async () => {
+    // #203: user:email scope granted + /user.email null → emails fetch is
+    // attempted; a non-ok emails response must NOT silently yield a null-email
+    // identity — it must surface as a typed error so the caller decides.
+    fetchSpy
+      .mockResolvedValueOnce(jsonResponse({ access_token: "gho_t", scope: "read:user,user:email" }))
+      .mockResolvedValueOnce(
+        jsonResponse({ id: 7, login: "u", name: null, email: null, avatar_url: "x" }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ message: "API rate limit exceeded" }, { status: 403 }),
+      );
+
+    const provider = github(OPTS);
+    await expect(
+      provider.handleCallback(mockReq(`?code=c&state=${TX.state}`), TX),
+    ).rejects.toMatchObject({ code: "emails_fetch_failed" });
+  });
+
+  it("test_github_emails_legitimately_empty_stays_null", async () => {
+    // #203 distinction: the emails endpoint SUCCEEDS but the user has no
+    // verified email → email is legitimately null and the callback succeeds.
+    // This must stay distinct from a fetch failure (which throws above).
+    fetchSpy
+      .mockResolvedValueOnce(jsonResponse({ access_token: "gho_t", scope: "read:user,user:email" }))
+      .mockResolvedValueOnce(
+        jsonResponse({ id: 8, login: "v", name: null, email: null, avatar_url: "x" }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse([{ email: "unverified@test.com", primary: true, verified: false }]),
+      );
+
+    const provider = github(OPTS);
+    const result = await provider.handleCallback(mockReq(`?code=c&state=${TX.state}`), TX);
+    expect(result.profile.email).toBeNull();
+  });
+
   it("does NOT fetch /user/emails when scope omits user:email", async () => {
     fetchSpy
       .mockResolvedValueOnce(jsonResponse({ access_token: "gho_t", scope: "read:user" }))

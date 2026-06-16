@@ -162,12 +162,22 @@ export function github(opts: GitHubProviderOptions): AuthProvider<GitHubProfile,
             accept: "application/vnd.github+json",
           },
         });
-        if (emailsRes.ok) {
-          const entries = (await emailsRes.json()) as EmailEntry[];
-          const primary = entries.find((e) => e.primary && e.verified);
-          email = primary?.email ?? entries.find((e) => e.verified)?.email ?? null;
+        // #203 (Rule 8 — fail loud): the user explicitly granted user:email and
+        // /user returned no email, so a failed /user/emails fetch is NOT benign —
+        // silently returning a null-email identity yields a broken account. Surface
+        // it as a typed error and let the caller decide (retry, degrade, abort).
+        if (!emailsRes.ok) {
+          throw new GitHubAuthError(
+            "emails_fetch_failed",
+            `GitHub /user/emails fetch failed: HTTP ${emailsRes.status} ` +
+              "(user:email scope was granted; refusing to return a null-email identity)",
+          );
         }
-        // If emails endpoint fails we leave email null — non-fatal per Wasp pattern
+        const entries = (await emailsRes.json()) as EmailEntry[];
+        const primary = entries.find((e) => e.primary && e.verified);
+        // email may still be null here when the user has NO verified email — that
+        // is a legitimate, documented outcome, distinct from the fetch failure above.
+        email = primary?.email ?? entries.find((e) => e.verified)?.email ?? null;
       }
 
       const profile: GitHubProfile = {
