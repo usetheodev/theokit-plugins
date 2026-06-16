@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- plugin-voice: `useTts` no longer lets a stale `speak()` whose `audio.play()` resolves late override a newer `speak()`/`stop()`. Each call captures its own controller and, after every await, bails when it is no longer the active call — tearing down only its own audio/blob URL/listeners instead of clobbering the newer call's state (#216)
 - plugin-voice: the TTS `voice` option is now validated against a single shared enum (`alloy`/`echo`/`fable`/`onyx`/`nova`/`shimmer`) at construction, so a misconfigured default voice fails fast instead of diverging from the server's runtime check and only surfacing as a 400 on the first request. The server's per-request voice validation now derives from the same source of truth (#215)
 - plugin-voice: a `MediaRecorder` error that fires while recording (with no `stop()` in flight) now always releases the media stream and is surfaced via a new `onError` recorder option, instead of being silently dropped with the microphone stream left open (#213)
 - plugin-voice: the STT and TTS server handlers now bound the upstream provider call with a timeout (default 30s, configurable via `timeoutMs`) and accept a client `signal`, so a stalled provider no longer hangs the handler indefinitely — a timeout or client abort returns `504 UPSTREAM_TIMEOUT` instead. Passing the signal to the real `fetch` also cancels the TTS streamed body when the client disconnects mid-stream (#211, #212)
