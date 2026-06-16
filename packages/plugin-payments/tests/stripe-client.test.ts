@@ -48,4 +48,21 @@ describe("createStripeClientGetter (P#6 T1.3)", () => {
     const after = get();
     expect(before).not.toBe(after);
   });
+
+  // T2.5 (#210) — apiVersion was passed via a blind `as Stripe.LatestApiVersion`
+  // cast, so a JS consumer could send an unsupported version that silently
+  // reaches the SDK. Now validated at runtime → fail loud.
+  it("throws on an unsupported apiVersion instead of blind-casting it (#210)", () => {
+    const { get } = createStripeClientGetter(
+      resolveOptions({ secretKey: "sk_test_xxx", apiVersion: "not-a-real-version" as never }),
+    );
+    expect(() => get()).toThrow(/api.?version/i);
+  });
+
+  it("accepts the supported apiVersion without throwing", () => {
+    const { get } = createStripeClientGetter(
+      resolveOptions({ secretKey: "sk_test_xxx", apiVersion: "2023-10-16" }),
+    );
+    expect(get()).toBeDefined();
+  });
 });

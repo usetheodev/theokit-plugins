@@ -25,6 +25,23 @@ export class StripeSecretKeyMissingError extends Error {
 }
 
 /**
+ * The Stripe API versions the pinned SDK accepts (`Stripe.LatestApiVersion`).
+ * Used to validate `apiVersion` at runtime so a JS consumer cannot smuggle an
+ * unsupported version past the type system into the SDK (#210).
+ */
+const ACCEPTED_API_VERSIONS: ReadonlySet<string> = new Set(["2023-10-16"]);
+
+/** Thrown when `apiVersion` is not one the pinned Stripe SDK accepts (#210). */
+export class StripeApiVersionError extends Error {
+  override readonly name = "StripeApiVersionError";
+  constructor(version: string) {
+    super(
+      `Unsupported Stripe apiVersion "${version}". Accepted: ${[...ACCEPTED_API_VERSIONS].join(", ")}.`,
+    );
+  }
+}
+
+/**
  * Create a lazy Stripe client closure scoped to a single plugin instance.
  *
  * The factory returns a `get()` function that lazily instantiates `new Stripe()`
@@ -42,7 +59,12 @@ export function createStripeClientGetter(opts: ResolvedPaymentsOptions): {
       if (!opts.secretKey) {
         throw new StripeSecretKeyMissingError();
       }
+      if (!ACCEPTED_API_VERSIONS.has(opts.apiVersion)) {
+        throw new StripeApiVersionError(opts.apiVersion);
+      }
       cached = new Stripe(opts.secretKey, {
+        // Validated against ACCEPTED_API_VERSIONS above — the narrowing is safe,
+        // not a blind cast (#210).
         apiVersion: opts.apiVersion as Stripe.LatestApiVersion,
         appInfo: {
           name: "@theokit/plugin-payments",
