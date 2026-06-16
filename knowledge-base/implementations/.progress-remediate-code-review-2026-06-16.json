@@ -121,6 +121,126 @@
    "files": [
     "packages/plugin-canvas/src/define-artifact-tool.ts"
    ]
+  },
+  {
+   "id": "T2.1",
+   "task_id": "T2.1",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "b074718",
+   "files": [
+    "packages/plugin-payments/src/currency.ts",
+    "packages/plugin-payments/tests/checkout.test.ts"
+   ],
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "SEPA caught plan's wrong zero-decimal set (UGX) + 3-decimal 10x undercharge \u2014 both fixed"
+  },
+  {
+   "id": "T2.2",
+   "task_id": "T2.2",
+   "phase": 2,
+   "status": "committed",
+   "reason": "UNBLOCKED by owner: extend IdempotencyStore with release() (claim+release design). Scope merged with part of T2.4.",
+   "files": [
+    "packages/plugin-payments/src/webhook.ts",
+    "packages/plugin-payments/src/idempotency-store.ts",
+    "packages/plugin-payments/tests/webhook.test.ts",
+    "packages/plugin-payments/tests/idempotency-store.test.ts",
+    "packages/plugin-payments/README.md",
+    ".changeset/payments-idempotency-release.md"
+   ],
+   "commit_sha": "0756375",
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "BLOCKED->owner chose claim+release design; merged store-half of T2.4; public interface change (changeset)"
+  },
+  {
+   "id": "T2.3",
+   "task_id": "T2.3",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "7baea9d",
+   "files": [
+    "packages/plugin-payments/src/webhook.ts",
+    "packages/plugin-payments/tests/webhook.test.ts",
+    ".changeset/payments-webhook-error-shape.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#208 AggregateError (uniform) + #201 sanitized boundary + redact log; public error-shape change (changeset)"
+  },
+  {
+   "id": "T2.4",
+   "task_id": "T2.4",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "aa87e8c",
+   "files": [
+    "packages/plugin-payments/src/index.ts",
+    "packages/plugin-payments/tests/factory.test.ts"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "wiring",
+    "commit"
+   ],
+   "note": "advisory warn (EC-13); SEPA consults consolidated (trivial guard)"
+  },
+  {
+   "id": "T2.5",
+   "task_id": "T2.5",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "2f53469",
+   "files": [
+    "packages/plugin-payments/src/stripe-client.ts",
+    "packages/plugin-payments/tests/stripe-client.test.ts"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "wiring",
+    "commit"
+   ],
+   "note": "SEPA pre-COMMIT unavailable (500 x2) -> self-review performed (low-risk validate-then-narrow guard)"
   }
  ]
 }
