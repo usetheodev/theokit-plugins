@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - plugin-canvas: removed a no-op `try/catch` around the agent-tool security gate (internal cleanup, no behavior change) (#181)
+- plugin-payments: `payments()` now logs a loud warning when it falls back to the default in-memory idempotency store under `NODE_ENV=production` — that store is not multi-replica safe; pass an explicit `idempotencyStore` in production (#202)
 
 ### Removed
 
