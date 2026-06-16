@@ -289,4 +289,84 @@ export function enforceArtifactSecurity(artifact: Artifact): void {
       )
     }
   }
+  // T1.2 (#178) — extend the gate to the remaining script-capable kinds.
+  if (artifact.kind === 'image' && artifact.source === 'data') {
+    enforceImageDataSecurity(artifact.dataUrl)
+  }
+  if (artifact.kind === 'mermaid' && hasMermaidScriptVector(artifact.content)) {
+    throw new CanvasArtifactSecurityError(
+      'Mermaid source contains a <script>, javascript: URL, or click-callback. Strip it before publishing.',
+      'mermaid-script-vector',
+    )
+  }
+  if (
+    artifact.kind === 'slide-deck' &&
+    typeof artifact.source === 'string' &&
+    /<script\b/i.test(artifact.source)
+  ) {
+    // String markdown is scanned for the obvious <script> vector. A pre-parsed
+    // array source is sanitised downstream by the SlideDeck primitive's own
+    // hast sanitiser (see file docstring) — explicit allow, no scan here.
+    throw new CanvasArtifactSecurityError(
+      'Slide-deck markdown contains <script>. Strip it before publishing.',
+      'slide-deck-script',
+    )
+  }
+}
+
+/**
+ * Decode an `image` `source:'data'` SVG data URL and run it through the SVG
+ * sanitiser. Only `image/svg+xml` is inspected (raster MIME types cannot carry
+ * executable markup). Malformed base64 is rejected as a typed security error so
+ * the boundary never leaks a raw `atob` DOMException to the caller (EC-6).
+ */
+function enforceImageDataSecurity(dataUrl: string): void {
+  if (!/^data:image\/svg\+xml;base64,/i.test(dataUrl)) return
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+  let decoded: string
+  try {
+    // atob yields a Latin-1 byte string; that is fine for ASCII script-vector
+    // detection (`<script>`/`javascript:` survive byte decode). Do NOT swap to
+    // TextDecoder — the sanitiser only needs the markup, not the encoding.
+    decoded = atob(base64)
+  } catch {
+    throw new CanvasArtifactSecurityError(
+      'image data URL is not valid base64.',
+      'image-data-malformed',
+    )
+  }
+  const { report } = sanitizeSvg(decoded)
+  if (report.removedScript) {
+    throw new CanvasArtifactSecurityError(
+      'SVG image data URL contains <script>. Strip it before publishing.',
+      'image-svg-script',
+    )
+  }
+  if (report.removedJsUrl) {
+    throw new CanvasArtifactSecurityError(
+      'SVG image data URL contains a javascript: href. Strip it before publishing.',
+      'image-svg-javascript-href',
+    )
+  }
+}
+
+/**
+ * Heuristic scan of mermaid DSL source for script-injection vectors. The
+ * boundary runs server-side and sync, so it cannot render mermaid; it scans
+ * the raw source for `<script>`, `javascript:` URLs, and the `click … call|href`
+ * callback form. `securityLevel:'strict'` is the render-time companion (T1.3).
+ *
+ * INTENTIONALLY CONSERVATIVE: the `<script>` / `javascript:` substring checks
+ * also reject a benign node *label* that merely contains those literals. A
+ * security boundary erring toward rejection is acceptable here — legitimate
+ * diagrams rarely embed these tokens, and the publisher can rephrase. The
+ * functional XSS defense is the render-time sanitize (T1.3) + strict mode;
+ * this scan is belt-and-suspenders.
+ */
+function hasMermaidScriptVector(source: string): boolean {
+  return (
+    /<script\b/i.test(source) ||
+    /javascript:/i.test(source) ||
+    /^\s*click\s+\S+\s+(?:call|href)\b/im.test(source)
+  )
 }
