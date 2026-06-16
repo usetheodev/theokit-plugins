@@ -38,6 +38,25 @@ export interface TtsInput {
 
 export interface TtsHandlerOptions {
   fetchImpl?: typeof fetch
+  /**
+   * Upstream request timeout in ms (#212). Defaults to 30s. After this elapses
+   * the upstream fetch is aborted and the handler returns 504 `UPSTREAM_TIMEOUT`.
+   */
+  timeoutMs?: number
+  /**
+   * Client request AbortSignal (#212). When the caller aborts, the upstream
+   * fetch is aborted too — for a real fetch this also cancels the streamed
+   * `audio/mpeg` response body (undici ties the body stream to the signal).
+   */
+  signal?: AbortSignal
+}
+
+/** Default upstream timeout (#212, ADR D8). */
+const DEFAULT_TIMEOUT_MS = 30_000
+
+/** True when an error is an abort/timeout (vs a genuine network failure). */
+function isAbortLike(err: unknown): boolean {
+  return err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError')
 }
 
 export async function handleTtsRequest(
@@ -91,6 +110,12 @@ export async function handleTtsRequest(
     upstreamPayload.speed = input.speed
   }
 
+  // #212: bound the upstream call. Compose the per-request timeout with the
+  // caller's abort signal so either trigger aborts the fetch; passing it to the
+  // real fetch also cancels the streamed body when the client aborts mid-stream.
+  const timeoutSignal = AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const signal =
+    opts.signal !== undefined ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal
   let upstream: Response
   try {
     upstream = await fetchImpl(url, {
@@ -100,8 +125,17 @@ export async function handleTtsRequest(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(upstreamPayload),
+      signal,
     })
   } catch (err) {
+    // #212: timeout or client abort → 504; genuine network errors stay 502.
+    if (isAbortLike(err)) {
+      return jsonError(
+        504,
+        'UPSTREAM_TIMEOUT',
+        `Upstream ${config.provider} TTS did not respond within the timeout.`,
+      )
+    }
     const wrapped = new VoicePluginError(
       `Network failure calling ${config.provider} TTS: ${err instanceof Error ? err.message : 'unknown'}`,
       { cause: err },

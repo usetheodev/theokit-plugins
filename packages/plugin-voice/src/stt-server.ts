@@ -56,6 +56,24 @@ export interface SttInput {
 
 export interface SttHandlerOptions {
   fetchImpl?: typeof fetch
+  /**
+   * Upstream request timeout in ms (#211). Defaults to 30s. After this elapses
+   * the upstream fetch is aborted and the handler returns 504 `UPSTREAM_TIMEOUT`.
+   */
+  timeoutMs?: number
+  /**
+   * Client request AbortSignal (#211). When the caller aborts, the in-flight
+   * upstream fetch is aborted too (no pending request is left dangling).
+   */
+  signal?: AbortSignal
+}
+
+/** Default upstream timeout (#211, ADR D8). */
+const DEFAULT_TIMEOUT_MS = 30_000
+
+/** True when an error is an abort/timeout (vs a genuine network failure). */
+function isAbortLike(err: unknown): boolean {
+  return err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError')
 }
 
 export interface SttResponseBody {
@@ -100,14 +118,30 @@ export async function handleSttRequest(
 
   const url = PROVIDER_URL[config.provider]
   const startedAt = Date.now()
+  // #211: bound the upstream call. Compose the per-request timeout with the
+  // caller's abort signal (if any) so either trigger aborts the fetch — passing
+  // it to fetch also lets undici cancel the response body on a real client abort.
+  const timeoutSignal = AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const signal =
+    opts.signal !== undefined ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal
   let upstream: Response
   try {
     upstream = await fetchImpl(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.apiKey}` },
       body: upstreamForm,
+      signal,
     })
   } catch (err) {
+    // #211: a timeout or client abort maps to 504; only genuine network errors
+    // remain 502 UPSTREAM_NETWORK. Branch on the error identity, not signal state.
+    if (isAbortLike(err)) {
+      return jsonError(
+        504,
+        'UPSTREAM_TIMEOUT',
+        `Upstream ${config.provider} Whisper did not respond within the timeout.`,
+      )
+    }
     const wrapped = new VoiceProviderError(
       config.provider,
       0,
