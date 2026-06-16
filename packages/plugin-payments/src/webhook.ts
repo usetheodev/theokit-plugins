@@ -95,29 +95,24 @@ export class WebhookRegistry {
   async dispatch(event: Stripe.Event): Promise<void> {
     const bucket = this.handlers.get(event.type);
     if (!bucket || bucket.length === 0) return;
-    // LIFO: most-recently-registered handler runs first.
-    // All handlers run even if one throws; first error is re-thrown after
-    // the loop so the caller's error contract (single Error) is preserved.
-    let firstError: unknown;
+    // LIFO: most-recently-registered handler runs first. ALL handlers run even
+    // if some throw; every error is collected and surfaced together as an
+    // AggregateError (#208) — no failure is reduced to a lost console.error.
+    const errors: unknown[] = [];
     for (let i = bucket.length - 1; i >= 0; i--) {
       const handler = bucket[i];
       if (!handler) continue;
       try {
         await handler.handle(event);
       } catch (err) {
-        if (firstError === undefined) {
-          firstError = err;
-        } else {
-          console.error('[plugin-payments] subsequent handler error in dispatch:', {
-            eventType: event.type,
-            eventId: event.id,
-            error: err,
-          });
-        }
+        errors.push(err);
       }
     }
-    if (firstError !== undefined) {
-      throw firstError;
+    if (errors.length > 0) {
+      throw new AggregateError(
+        errors,
+        `${errors.length} webhook handler(s) failed for event "${event.type}".`,
+      );
     }
   }
 
@@ -168,10 +163,40 @@ export function verifyAndParseWebhook(
  *   - `signature_invalid` (400) — reject with error message
  *   - `handler_error` (500) — consumer's handler threw
  */
+/**
+ * A sanitized error surfaced to the HTTP layer. NEVER carries the raw handler
+ * error (which may contain PII/secrets, #201) — `code` is a stable control-flow
+ * token and `message` is a fixed generic string. The full error is logged
+ * server-side (redacted) by `processWebhook`.
+ */
+export interface SanitizedWebhookError {
+  code: string;
+  message: string;
+}
+
 export type WebhookResult =
   | { status: "ok"; eventId: string; duplicate: boolean }
   | { status: "signature_invalid"; message: string }
-  | { status: "handler_error"; eventId: string; error: unknown };
+  | { status: "handler_error"; eventId: string; error: SanitizedWebhookError };
+
+/**
+ * Redact known secret shapes (Stripe keys, basic-auth credentials in URLs) from
+ * a value before it is logged. Best-effort defense-in-depth — the primary
+ * guarantee is that the raw error never crosses the HTTP boundary at all.
+ */
+function redactSecrets(value: unknown): string {
+  const text =
+    value instanceof AggregateError
+      ? `AggregateError: ${value.message} [${value.errors
+          .map((e) => (e instanceof Error ? e.message : String(e)))
+          .join(" | ")}]`
+      : value instanceof Error
+        ? `${value.name}: ${value.message}`
+        : String(value);
+  return text
+    .replace(/\b(whsec|sk_live|sk_test|pk_live|pk_test|rk_live|rk_test)_[A-Za-z0-9]+/g, "$1_***REDACTED***")
+    .replace(/\/\/[^:/@\s]+:[^@/\s]+@/g, "//***:***@");
+}
 
 export async function processWebhook(opts: {
   stripe: Stripe;
@@ -215,7 +240,17 @@ export async function processWebhook(opts: {
         { eventId: event.id, releaseError },
       );
     }
-    return { status: "handler_error", eventId: event.id, error };
+    // #201: log the FULL error server-side (redacted), expose only a sanitized
+    // {code,message} at the HTTP boundary so secrets/PII never leak to the caller.
+    console.error("[plugin-payments] webhook handler error:", {
+      eventId: event.id,
+      error: redactSecrets(error),
+    });
+    return {
+      status: "handler_error",
+      eventId: event.id,
+      error: { code: "handler_error", message: "One or more webhook handlers failed." },
+    };
   }
   return { status: "ok", eventId: event.id, duplicate: false };
 }
