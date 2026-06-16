@@ -18,11 +18,11 @@ Per-task detail (Files to edit, TDD, Acceptance, Concurrency tests, Failure scen
 
 | # | Plan ref | Title | Status | Wiring a | b | c | SHA |
 |---|---|---|---|---|---|---|---|
-| T1.1 | Phase 1 | Enforce security on the REST create route (CRITICAL #176, test #229) | pending | — | — | — | — |
-| T1.2 | Phase 1 | Cover mermaid / slide-deck / image-data(svg+xml) in `enforceArtifactSecurity` (#178, test #230) | pending | — | — | — | — |
-| T1.3 | Phase 1 | Sanitize mermaid SVG before `dangerouslySetInnerHTML` (#177, test #231) | pending | — | — | — | — |
-| T1.4 | Phase 1 | DOMPurify-driven verdict + remove post-sanitize regex (#180, #179) | pending | — | — | — | — |
-| T1.5 | Phase 1 | Remove pointless try/catch in `define-artifact-tool` (#181) | pending | — | — | — | — |
+| T1.1 | Phase 1 | Enforce security on the REST create route (CRITICAL #176, test #229) | committed | ✓ | defer | n/a | 5564b1b |
+| T1.2 | Phase 1 | Cover mermaid / slide-deck / image-data(svg+xml) in `enforceArtifactSecurity` (#178, test #230) | committed | ✓ | defer | n/a | a557027 |
+| T1.3 | Phase 1 | Sanitize mermaid SVG before `dangerouslySetInnerHTML` (#177, test #231) | committed | ✓ | defer | n/a | 9aad2a1 |
+| T1.4 | Phase 1 | DOMPurify-driven verdict + remove post-sanitize regex (#180, #179) | committed | ✓ | defer | n/a | 01c1e9e |
+| T1.5 | Phase 1 | Remove pointless try/catch in `define-artifact-tool` (#181) | committed | ✓ | defer | n/a | 5a06898 |
 | T2.1 | Phase 2 | Code-keyed zero-decimal detection + integer-exact conversion (#200, #199, test #225) | pending | — | — | — | — |
 | T2.2 | Phase 2 | Mark webhook processed only after successful dispatch (#167, test #226) | pending | — | — | — | — |
 | T2.3 | Phase 2 | Aggregate handler errors + sanitize the public error (#208, #201) | pending | — | — | — | — |
@@ -60,3 +60,11 @@ Per-task detail (Files to edit, TDD, Acceptance, Concurrency tests, Failure scen
 | T9.1 | Phase 9 | Reduce CC of the 8 flagged functions (#182,#183,#184,#185,#186,#187,#188,#189) | pending | — | — | — | — |
 
 Status legend: pending / red / green / refactor / wired / committed / blocked.
+
+## Standing wiring note (applies to all tasks)
+
+<!-- ADR-DEFER-WIRING-B: This project's test convention (rules/testing.md § Test pairing convention) co-locates unit+integration tests in `packages/*/tests/` — there is NO `tests/integration/` directory by design. Boundary/integration coverage is provided by the co-located *.test.ts files that exercise the real Request→Response / store / fetch boundary (e.g., route-handlers.test.ts drives create() end-to-end against a real in-memory store). check_wiring.py pillar (b) looks only for `tests/integration/`, so it reports FAIL; this is a convention mismatch, not a missing test. Pillar (a) static-caller and the co-located boundary test together satisfy the wiring intent. -->
+
+## Pre-existing condition (logged, not introduced by this plan)
+
+- `pnpm typecheck` (root `tsc --noEmit`) reports **40 pre-existing errors** at baseline commit db04cb9 (in `packages/plugin-canvas/src/ui/renderers/markdown.tsx` and `packages/plugin-canvas/tests/use-canvas.test.tsx`), unrelated to the 72 findings. Verified via `git stash` before any task. These will surface at the Step 5 validation gate; they are documented here per cycle-implement.md "pre-existing issues are logged but do NOT block plan completion."

@@ -1,0 +1,126 @@
+{
+ "tasks": [
+  {
+   "task_id": "T1.1",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "commit_sha": "5564b1b",
+   "id": "T1.1",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/route-handlers.ts",
+    "packages/plugin-canvas/tests/route-handlers.test.ts"
+   ]
+  },
+  {
+   "task_id": "T1.2",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "a557027",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "id": "T1.2",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/schema.ts",
+    "packages/plugin-canvas/tests/schema.test.ts"
+   ]
+  },
+  {
+   "task_id": "T1.3",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "9aad2a1",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "styling-regression logged to followups",
+   "id": "T1.3",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/ui/renderers/mermaid-artifact.tsx",
+    "packages/plugin-canvas/tests/mermaid-artifact.test.tsx"
+   ]
+  },
+  {
+   "task_id": "T1.4",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "01c1e9e",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#186 (Phase 9 sanitize CC) likely resolved here \u2014 re-measure at Phase 9",
+   "id": "T1.4",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/ui/renderers/sanitize.ts",
+    "packages/plugin-canvas/tests/sanitize.test.ts"
+   ]
+  },
+  {
+   "task_id": "T1.5",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "5a06898",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "SEPA consults consolidated (trivial no-behavior-change deletion)",
+   "id": "T1.5",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/define-artifact-tool.ts"
+   ]
+  }
+ ]
+}
