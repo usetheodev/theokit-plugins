@@ -95,15 +95,31 @@ function loadYjs(): Promise<{ yjs: YjsModule; awareness: YAwarenessModule }> {
   return pendingYjs;
 }
 
+/** Resolved Yjs handles for a room. Returned by `ensureYjs` so callers don't
+ *  re-invoke `loadYjs()` (#196). */
+interface YjsBundle {
+  readonly doc: YDocLike;
+  readonly awareness: AwarenessLike;
+  readonly yjs: YjsModule;
+  readonly awMod: YAwarenessModule;
+}
+
 interface YjsRoomState {
   /** Per-connection presence (LWW; identical to MemoryProvider semantics). */
   readonly presences: Map<string, Presence>;
   /** Active room listeners. */
   readonly listeners: Set<(frame: RealtimeFrame) => void>;
-  /** Lazily-initialized Y.Doc (created on first applyYjsUpdate / awareness call). */
-  doc: YDocLike | null;
-  /** Lazily-initialized Awareness (same trigger). */
-  awareness: AwarenessLike | null;
+  /**
+   * In-flight (or resolved) Y.Doc/Awareness init — the SINGLE source of truth
+   * for the room's doc (#193). Memoized so concurrent `applyYjs*` calls share
+   * exactly one Y.Doc instead of racing on a check-then-act. There is no
+   * separate `doc`/`awareness` fast-path field on purpose: two sources of truth
+   * for "the room's doc" would reintroduce the race.
+   */
+  docInit?: Promise<YjsBundle>;
+  /** Synchronous handle to the resolved bundle, set INSIDE the docInit factory,
+   *  so `gcIfEmpty` can destroy() without awaiting. */
+  resolved?: YjsBundle;
 }
 
 /**
@@ -139,20 +155,35 @@ export function createYjsRealtimeProvider(
   const ensureRoom = (roomId: string): YjsRoomState => {
     let state = rooms.get(roomId);
     if (state === undefined) {
-      state = { presences: new Map(), listeners: new Set(), doc: null, awareness: null };
+      state = { presences: new Map(), listeners: new Set() };
       rooms.set(roomId, state);
     }
     return state;
   };
 
-  const ensureYjs = async (state: YjsRoomState): Promise<{ doc: YDocLike; awareness: AwarenessLike }> => {
-    if (state.doc !== null && state.awareness !== null) {
-      return { doc: state.doc, awareness: state.awareness };
-    }
-    const { yjs, awareness: aw } = await loadYjs();
-    state.doc = new yjs.Doc({ gc: true });
-    state.awareness = new aw.Awareness(state.doc);
-    return { doc: state.doc, awareness: state.awareness };
+  const ensureYjs = (state: YjsRoomState): Promise<YjsBundle> => {
+    // #193: single-flight memo. `??=` is synchronous, so two concurrent callers
+    // both assign the SAME factory before either yields at `await` — closing the
+    // check-then-act race that previously orphaned a duplicate Y.Doc. The memo
+    // also carries the loaded modules so callers stop re-invoking loadYjs (#196).
+    state.docInit ??= (async (): Promise<YjsBundle> => {
+      const { yjs, awareness: awMod } = await loadYjs();
+      const doc = new yjs.Doc({ gc: true });
+      const awareness = new awMod.Awareness(doc);
+      const bundle: YjsBundle = { doc, awareness, yjs, awMod };
+      // Synchronous handle for gcIfEmpty.destroy() (set after the awaits).
+      state.resolved = bundle;
+      // TODO(#194 / T4.2): if the room is GC'd while this init is in flight,
+      // the resolved doc is orphaned (never destroyed). The destroyed-doc guard
+      // lands in T4.2; this memo is shaped so that guard can hook the resolve.
+      return bundle;
+    })().catch((e) => {
+      // EC-1: a failed init clears the memo so a later apply can recreate the
+      // doc — no permanently bricked room.
+      state.docInit = undefined;
+      throw e;
+    });
+    return state.docInit;
   };
 
   const fanout = (state: YjsRoomState, frame: RealtimeFrame): void => {
@@ -170,8 +201,12 @@ export function createYjsRealtimeProvider(
 
   const gcIfEmpty = (roomId: string, state: YjsRoomState): void => {
     if (state.presences.size === 0 && state.listeners.size === 0) {
-      if (state.awareness !== null) state.awareness.destroy();
-      if (state.doc !== null) state.doc.destroy();
+      // Only a resolved bundle has a doc to destroy. A doc whose init is still
+      // in flight (resolved === undefined) is handled by the T4.2/#194 guard.
+      if (state.resolved !== undefined) {
+        state.resolved.awareness.destroy();
+        state.resolved.doc.destroy();
+      }
       rooms.delete(roomId);
     }
   };
@@ -252,8 +287,8 @@ export function createYjsRealtimeProvider(
       }
       const state = rooms.get(roomId);
       if (state === undefined) return;
-      const { doc } = await ensureYjs(state);
-      const { yjs } = await loadYjs();
+      // #196: ensureYjs returns the loaded module in the bundle — no redundant loadYjs.
+      const { doc, yjs } = await ensureYjs(state);
       yjs.applyUpdate(doc, bytes, connectionId);
     },
 
@@ -266,8 +301,8 @@ export function createYjsRealtimeProvider(
       }
       const state = rooms.get(roomId);
       if (state === undefined) return;
-      const { awareness } = await ensureYjs(state);
-      const { awareness: awMod } = await loadYjs();
+      // #196: ensureYjs returns the loaded module in the bundle — no redundant loadYjs.
+      const { awareness, awMod } = await ensureYjs(state);
       awMod.applyAwarenessUpdate(awareness, bytes, connectionId);
     },
   };
