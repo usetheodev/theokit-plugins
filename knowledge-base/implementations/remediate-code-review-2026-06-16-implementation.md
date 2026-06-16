@@ -36,13 +36,13 @@ Per-task detail (Files to edit, TDD, Acceptance, Concurrency tests, Failure scen
 | T4.2 | Phase 4 | Guard `applyYjsUpdate` against destroyed/GC'd docs (#194) | committed | ✓ | defer | n/a | be6ec38 |
 | T4.3 | Phase 4 | server-integration: abort handling + bounded queue (#195, #198, test #235) | committed | ✓ | defer | n/a | 3e7af67 |
 | T4.4 | Phase 4 | Fail loudly when a yjs-storage room lacks provider support (#197) | committed | ✓ | defer | n/a | ca041df |
-| T5.1 | Phase 5 | STT/TTS upstream timeout/abort (#211, #212, test #236) | pending | — | — | — | — |
-| T5.2 | Phase 5 | Recorder: release stream + surface error on recording error (#213, test #237) | pending | — | — | — | — |
-| T5.3 | Phase 5 | Don't reflect upstream error bodies (#214) | pending | — | — | — | — |
-| T5.4 | Phase 5 | Unify TTS voice enum across schema & server (#215) | pending | — | — | — | — |
-| T5.5 | Phase 5 | use-tts: cancel stale playback on newer speak()/stop() (#216, test #238) | pending | — | — | — | — |
-| T5.6 | Phase 5 | voice-recorder-bar: guard STT JSON parse (#217) | pending | — | — | — | — |
-| T5.7 | Phase 5 | Fix stale docstring in voice index (#175) | pending | — | — | — | — |
+| T5.1 | Phase 5 | STT/TTS upstream timeout/abort (#211, #212, test #236) | committed | ✓ | defer | n/a | 243e7a6 |
+| T5.2 | Phase 5 | Recorder: release stream + surface error on recording error (#213, test #237) | committed | ✓ | defer | n/a | c3f3a35 |
+| T5.3 | Phase 5 | Don't reflect upstream error bodies (#214) | committed | ✓ | defer | n/a | db271df |
+| T5.4 | Phase 5 | Unify TTS voice enum across schema & server (#215) | committed | ✓ | defer | n/a | 9208043 |
+| T5.5 | Phase 5 | use-tts: cancel stale playback on newer speak()/stop() (#216, test #238) | committed | ✓ | defer | n/a | 18fc976 |
+| T5.6 | Phase 5 | voice-recorder-bar: guard STT JSON parse (#217) | committed | ✓ | defer | n/a | 1d8ee52 |
+| T5.7 | Phase 5 | Fix stale docstring in voice index (#175) | committed | n/a | n/a | n/a | 868b64b |
 | T6.1 | Phase 6 | Isolate untrusted room text into a user-role message (#218, test #232) | pending | — | — | — | — |
 | T6.2 | Phase 6 | One per-copilot queue + atomic budget; idle-trigger guarded (#219, #223, #221, test #233) | pending | — | — | — | — |
 | T6.3 | Phase 6 | handleFrame: log errors instead of empty catch (#222) | pending | — | — | — | — |

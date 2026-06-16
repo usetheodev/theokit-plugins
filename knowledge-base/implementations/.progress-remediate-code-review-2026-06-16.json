@@ -441,6 +441,182 @@
     "commit"
    ],
    "note": "#197 fail-loud: storage:'yjs' room + provider without applyYjsUpdate/applyYjsAwareness -> RealtimeError(yjs_provider_unsupported) instead of silent drop. Non-yjs rooms unchanged (existing no-op test green). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.1",
+   "task_id": "T5.1",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "243e7a6",
+   "files": [
+    "packages/plugin-voice/src/stt-server.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    "packages/plugin-voice/tests/stt-server.test.ts",
+    "packages/plugin-voice/tests/tts-server.test.ts",
+    ".changeset/voice-stt-tts-upstream-timeout.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#211/#212 AbortSignal.timeout(30s default)+AbortSignal.any(client) -> fetch; abort/timeout -> 504 UPSTREAM_TIMEOUT (branch on err.name), network stays 502. undici cancels TTS stream on client abort via signal (not mock-tested; integration). additive opts. SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T5.2",
+   "task_id": "T5.2",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "c3f3a35",
+   "files": [
+    "packages/plugin-voice/src/recorder.ts",
+    "packages/plugin-voice/tests/recorder.test.ts",
+    ".changeset/voice-recorder-error-release.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#213 error event always releaseStream + onError (additive opt) when no stop pending; stop-pending path unchanged. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.3",
+   "task_id": "T5.3",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "db271df",
+   "files": [
+    "packages/plugin-voice/src/stt-server.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    "packages/plugin-voice/tests/stt-server.test.ts",
+    "packages/plugin-voice/tests/tts-server.test.ts",
+    ".changeset/voice-no-upstream-body-reflection.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#214 raw upstream body no longer reflected; logged server-side (console.error, package precedent) under randomUUID correlation id; client gets generic msg + same id. status mapping preserved. SEPA pre-COMMIT GO (corrected lint net-zero via Promise.resolve arrows)."
+  },
+  {
+   "id": "T5.4",
+   "task_id": "T5.4",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "9208043",
+   "files": [
+    "packages/plugin-voice/src/options.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    "packages/plugin-voice/src/ui/talk-options.tsx",
+    "packages/plugin-voice/tests/scaffold.test.ts",
+    ".changeset/voice-unify-tts-voice-enum.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#215 VALID_VOICES single SoT in options.ts (z.enum); tts-server imports it (VOICE_SET); invalid default rejected at construction + compile-time (@ts-expect-error proof). talk-options docstring repointed. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.5",
+   "task_id": "T5.5",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "18fc976",
+   "files": [
+    "packages/plugin-voice/src/ui/use-tts.ts",
+    "packages/plugin-voice/tests/use-tts.test.tsx",
+    ".changeset/voice-use-tts-stale-playback.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#216 per-call controller identity guard (isStale=abortRef.current!==controller) at all post-await checkpoints; stale-after-play tears down OWN audio+url+listeners (removeEventListener must-add per SEPA), no cleanupAudio/no setPhase. listener/cleanupAudio internals out-of-scope (follow-up). SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T5.6",
+   "task_id": "T5.6",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "1d8ee52",
+   "files": [
+    "packages/plugin-voice/src/ui/voice-recorder-bar.tsx",
+    "packages/plugin-voice/tests/voice-recorder-bar.test.tsx",
+    ".changeset/voice-recorder-bar-stt-parse-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#217 res.json() wrapped in try/catch -> VoicePluginError('Invalid STT response') with cause; surfaced via onError. happy path + !res.ok untouched. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.7",
+   "task_id": "T5.7",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "n/a",
+    "c": "n/a"
+   },
+   "commit_sha": "868b64b",
+   "files": [
+    "packages/plugin-voice/src/index.ts"
+   ],
+   "phases_completed": [
+    "green",
+    "commit"
+   ],
+   "note": "#175 doc-only: index.ts docstring corrected to real handler signatures (input,config,opts?). No CHANGELOG/changeset (internal doc, not consumer-facing per Rule 6). typecheck baseline unchanged."
   }
  ]
 }
