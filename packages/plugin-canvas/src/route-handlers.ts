@@ -22,10 +22,11 @@
 
 import {
   CanvasArtifactNotFoundError,
+  CanvasArtifactSecurityError,
   CanvasArtifactValidationError,
   CanvasPluginError,
 } from './errors.js'
-import { ARTIFACT_KINDS, validateArtifact } from './schema.js'
+import { ARTIFACT_KINDS, enforceArtifactSecurity, validateArtifact } from './schema.js'
 import type { ArtifactListFilter, ArtifactStore } from './store.js'
 
 export interface ArtifactRouteHandlerOptions {
@@ -122,10 +123,16 @@ export function createArtifactRouteHandlers(
       if (!validation.ok) {
         return jsonError(400, 'INVALID_ARTIFACT', validation.error.message)
       }
-      let toInsert = validation.artifact
-      // Auto-version: if the caller omitted `version` (always defaulted
-      // to 1 by Zod) AND the id already has a row, bump to next.
       try {
+        // Security gate (T1.1 / #176): the REST create path MUST reject
+        // script-bearing artifacts, identical to the agent-tool path. Without
+        // this, a direct POST persists stored-XSS payloads (OWASP A03). Kept
+        // inside the same try so a non-security error still routes through
+        // errorToResponse (500) rather than escaping unhandled.
+        enforceArtifactSecurity(validation.artifact)
+        let toInsert = validation.artifact
+        // Auto-version: if the caller omitted `version` (always defaulted
+        // to 1 by Zod) AND the id already has a row, bump to next.
         const existing = await store.get(toInsert.id)
         if (existing !== null && existing.version >= toInsert.version) {
           const next = await store.nextVersion(toInsert.id)
@@ -145,6 +152,9 @@ export function createArtifactRouteHandlers(
         }
         return jsonResponse({ artifact: stored }, { status: 201 })
       } catch (err) {
+        if (err instanceof CanvasArtifactSecurityError) {
+          return jsonError(400, err.reason, err.message)
+        }
         return errorToResponse(err)
       }
     },

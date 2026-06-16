@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Stale prior-run review artifacts from `code-review-output/` (2026-06-11 phase reports + figures superseded by the 2026-06-16 audit)
 
+### Security
+
+- plugin-canvas: enforce artifact security on the REST `POST /artifacts` route — script-bearing SVG and meta-refresh HTML are now rejected with 400 before persistence, closing a stored-XSS bypass that previously only guarded the agent-tool path (#176)
+
 ## [0.1.0] - 2026-06-11
 
 ### Added
