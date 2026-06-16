@@ -106,6 +106,20 @@ describe('sanitizeSvg', () => {
     expect(report.removedOnHandler).toBe(false)
     expect(report.removedJsUrl).toBe(false)
   })
+
+  // T1.4 (#179 regex mutate corrupts valid markup + #180 lossy verdict):
+  // a benign https href that merely contains the literal "javascript:" in its
+  // query string is SAFE (DOMPurify keeps it — the scheme is https). The old
+  // post-sanitize regex deleted the whole href (corruption, #179) AND the
+  // regex-diff verdict then falsely reported removedJsUrl=true (#180).
+  it('keeps a benign https href containing "javascript:" in its query and does not falsely flag removedJsUrl', () => {
+    const { output, report } = sanitizeSvg(
+      '<svg xmlns="http://www.w3.org/2000/svg"><a href="https://example.com/?ref=javascript:guide"><rect/></a></svg>',
+    )
+    expect(output).toContain('example.com') // #179: valid href not nuked
+    expect(output).toMatch(/href=/) // the href attribute survives
+    expect(report.removedJsUrl).toBe(false) // #180: accurate verdict — nothing js-URL was removed
+  })
 })
 
 describe('sanitizeHtmlSrcdoc', () => {

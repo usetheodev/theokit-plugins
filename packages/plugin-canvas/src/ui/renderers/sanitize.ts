@@ -34,68 +34,93 @@ function createEmptyReport(): SanitizeReport {
   }
 }
 
+/** Shape of a `DOMPurify.removed` entry (element removal OR attribute removal). */
+interface RemovedEntry {
+  element?: { nodeName?: string } | null
+  attribute?: { name?: string; value?: string } | null
+}
+
 /**
- * Classify what DOMPurify removed by comparing input patterns.
- * DOMPurify hooks don't reliably report everything it strips,
- * so we detect removals by checking what was in the input but
- * absent from the output.
+ * Classify what DOMPurify actually removed, read from `DOMPurify.removed`
+ * (T1.4 / ADR D2). This replaces the old input-vs-output regex diff, which was
+ * lossy (#180) — DOMPurify reports the real removed elements and attributes, so
+ * the security verdict the boundary relies on is exact, not inferred. The parser
+ * wrapper element (`BODY`) is filtered out; node names are case-normalised.
  */
-function classifyRemovals(input: string, output: string): SanitizeReport {
+function classifyRemoved(removed: readonly RemovedEntry[]): SanitizeReport {
   const report = createEmptyReport()
-  const inLower = input.toLowerCase()
-  const outLower = output.toLowerCase()
-
-  if (/<script\b/i.test(input) && !/<script\b/i.test(output))
-    report.removedScript = true
-  if (/<iframe\b/i.test(input) && !/<iframe\b/i.test(output))
-    report.removedIframe = true
-  if (/<object\b/i.test(input) && !/<object\b/i.test(output))
-    report.removedObject = true
-  if (/<embed\b/i.test(input) && !/<embed\b/i.test(output))
-    report.removedEmbed = true
-  if (/\bon[a-z]+\s*=/i.test(inLower) && !/\bon[a-z]+\s*=/i.test(outLower))
-    report.removedOnHandler = true
-  // Newline-evaded on-handlers: on\n + event name
-  if (/on\s+[a-z]+\s*=/i.test(inLower) && !/on\s+[a-z]+\s*=/i.test(outLower))
-    report.removedOnHandler = true
-  if (/javascript\s*:/i.test(inLower) && !/javascript\s*:/i.test(outLower))
-    report.removedJsUrl = true
-  if (/data:(?:text\/html|application\/javascript)/i.test(inLower) &&
-    !/data:(?:text\/html|application\/javascript)/i.test(outLower))
-    report.removedDataUrl = true
-
+  for (const entry of removed) {
+    if (entry.element) {
+      const name = String(entry.element.nodeName ?? '').toLowerCase()
+      if (name === 'script') report.removedScript = true
+      else if (name === 'iframe') report.removedIframe = true
+      else if (name === 'object') report.removedObject = true
+      else if (name === 'embed') report.removedEmbed = true
+    } else if (entry.attribute) {
+      const attrName = String(entry.attribute.name ?? '').toLowerCase()
+      const attrValue = String(entry.attribute.value ?? '')
+      if (/^on/i.test(attrName)) report.removedOnHandler = true
+      if (/^\s*javascript:/i.test(attrValue)) report.removedJsUrl = true
+      if (/^\s*data:(?:text\/html|application\/javascript)/i.test(attrValue))
+        report.removedDataUrl = true
+    }
+  }
   return report
 }
 
+/**
+ * `uponSanitizeAttribute` hook for the SVG pass. Replaces the old post-sanitize
+ * regex MUTATE (#179) with in-parse attribute policy:
+ *   - scrub CSS `expression(...)` from `style` (DOMPurify does not strip it),
+ *   - drop external (non-fragment) `href`/`xlink:href` on `<use>` (defense in
+ *     depth — `<use>` is currently dropped by the SVG profile, but this guards
+ *     the day it is re-allowed; the old regex did this post-hoc and could
+ *     mangle valid markup).
+ */
+function svgAttributePolicy(
+  node: { nodeName?: string },
+  data: { attrName: string; attrValue: string; keepAttr: boolean },
+): void {
+  if (data.attrName === 'style' && /expression\s*\(/i.test(data.attrValue)) {
+    data.attrValue = data.attrValue.replace(/expression\s*\([^)]*\)/gi, '')
+  }
+  if (
+    (data.attrName === 'href' || data.attrName === 'xlink:href') &&
+    String(node.nodeName ?? '').toLowerCase() === 'use' &&
+    !data.attrValue.startsWith('#')
+  ) {
+    data.keepAttr = false
+  }
+}
+
 export function sanitizeSvg(input: string): SanitizeResult {
-  const output = DOMPurify.sanitize(input, {
-    USE_PROFILES: { svg: true, svgFilters: true },
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'foreignObject',
-      'math', 'annotation-xml'],
-    FORBID_ATTR: ['formaction'],
-    ALLOW_DATA_ATTR: false,
-    ALLOW_UNKNOWN_PROTOCOLS: false,
-    // Strip all on-event attributes
-    ADD_ATTR: [],
-  })
-
-  // Post-sanitize: strip any remaining dangerous patterns DOMPurify
-  // might have kept (defense in depth)
-  let cleaned = output
-    // Strip javascript: URIs that survived
-    .replace(/(href|src|xlink:href)\s*=\s*"[^"]*javascript:[^"]*"/gi, '')
-    .replace(/(href|src|xlink:href)\s*=\s*'[^']*javascript:[^']*'/gi, '')
-    // Strip data: URIs for text/html and application/javascript
-    .replace(/(href|src|xlink:href)\s*=\s*"[^"]*data:(?:text\/html|application\/javascript)[^"]*"/gi, '')
-    .replace(/(href|src|xlink:href)\s*=\s*'[^']*data:(?:text\/html|application\/javascript)[^']*'/gi, '')
-    // Strip CSS expression()
-    .replace(/expression\s*\([^)]*\)/gi, '')
-    // Strip external URLs in <use> xlink:href (allow only fragment refs)
-    .replace(/(<use[^>]*(?:href|xlink:href)\s*=\s*")https?:\/\/[^"]*(")/gi, '$1$2')
-    .replace(/(<use[^>]*(?:href|xlink:href)\s*=\s*')https?:\/\/[^']*(')/gi, '$1$2')
-
-  const report = classifyRemovals(input, cleaned)
-  return { output: cleaned, report }
+  // MUST remain SYNCHRONOUS: the singleton hook and the `DOMPurify.removed`
+  // snapshot below are not re-entrancy-safe across `await`. DOMPurify.sanitize
+  // is sync and JS is single-threaded, so two sanitize calls never interleave;
+  // adding an `await` inside this function would break that invariant.
+  //
+  // In-parse attribute policy (expression scrub + external <use> drop) replaces
+  // the old post-sanitize regex MUTATE (#179). Registered on the singleton, so
+  // it MUST be removed in `finally` — a leaked hook corrupts every other caller.
+  DOMPurify.addHook('uponSanitizeAttribute', svgAttributePolicy)
+  try {
+    const output = DOMPurify.sanitize(input, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'foreignObject',
+        'math', 'annotation-xml'],
+      FORBID_ATTR: ['formaction'],
+      ALLOW_DATA_ATTR: false,
+      ALLOW_UNKNOWN_PROTOCOLS: false,
+      // Strip all on-event attributes
+      ADD_ATTR: [],
+    })
+    // `DOMPurify.removed` is a shared mutable array overwritten on every call —
+    // snapshot it immediately so the verdict reflects THIS sanitize (#180).
+    const removed = [...(DOMPurify.removed as unknown as RemovedEntry[])]
+    return { output, report: classifyRemoved(removed) }
+  } finally {
+    DOMPurify.removeHook('uponSanitizeAttribute')
+  }
 }
 
 export function sanitizeHtmlSrcdoc(input: string): SanitizeResult {
