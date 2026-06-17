@@ -72,6 +72,14 @@ export class CopilotRuntime {
   private readonly queues = new Map<string, Promise<void>>();
   private readonly evaluator = new TriggerEvaluator();
   private readonly roundRobinCursor = new Map<string, number>();
+  /**
+   * #220: per-room memo of the round-robin decision for the CURRENT frame.
+   * `_handleFrame` runs once per copilot, so without this the cursor would
+   * advance N times per frame (degrading round-robin to 'all'). Keyed by room;
+   * the entry is reused (no advance) for every copilot call of the SAME frame
+   * object (identity ===) and overwritten on the next frame.
+   */
+  private readonly roundRobinDecision = new Map<string, { frame: CopilotFrame; chosen: string[] }>();
   private readonly provider: CopilotRealtimeProvider;
   private readonly agent: CopilotAgentLike;
   private readonly defaultDispatcher: CopilotDispatcher;
@@ -238,7 +246,7 @@ export class CopilotRuntime {
     // copilots share the same room — single-copilot path always responds).
     const copilotsInRoom = this.copilotsInRoom(reg.descriptor.room.id);
     const dispatcher = reg.descriptor.dispatcher ?? this.defaultDispatcher;
-    const chosen = this.applyDispatcher(dispatcher, copilotsInRoom, frame);
+    const chosen = this.applyDispatcher(dispatcher, copilotsInRoom, reg.descriptor.room.id, frame);
     if (!chosen.includes(reg.descriptor.id)) return;
 
     for (const match of matches) {
@@ -339,6 +347,7 @@ export class CopilotRuntime {
   private applyDispatcher(
     dispatcher: CopilotDispatcher,
     copilots: ReadonlyArray<{ id: string }>,
+    roomId: string,
     frame: CopilotFrame,
   ): string[] {
     if (copilots.length === 0) return [];
@@ -350,10 +359,20 @@ export class CopilotRuntime {
       case "all":
         return copilots.map((c) => c.id);
       case "round-robin": {
-        const roomId = (frame as { connectionId?: string }).connectionId ?? "global";
+        // #220: key the cursor by ROOM (not connection), and advance it exactly
+        // ONCE per frame. `_handleFrame` calls this once per copilot, so we memo
+        // the decision for the current frame (identity ===) and reuse it for the
+        // sibling copilots' calls — otherwise the cursor would advance N times
+        // per frame and every copilot would select itself (degrading to 'all').
+        const cached = this.roundRobinDecision.get(roomId);
+        if (cached !== undefined && cached.frame === frame) {
+          return cached.chosen;
+        }
         const cursor = (this.roundRobinCursor.get(roomId) ?? 0) % copilots.length;
         this.roundRobinCursor.set(roomId, cursor + 1);
-        return [copilots[cursor]!.id];
+        const chosen = [copilots[cursor]!.id];
+        this.roundRobinDecision.set(roomId, { frame, chosen });
+        return chosen;
       }
       case "first-wins":
       default:

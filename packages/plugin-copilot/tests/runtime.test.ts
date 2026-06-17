@@ -227,6 +227,33 @@ describe("CopilotRuntime", () => {
     expect(responders).toContain("beta");
   });
 
+  it("test_round_robin_keyed_by_room (#220)", async () => {
+    const provider = makeMemoryProvider();
+    const onResponse = vi.fn();
+    const c1 = defineCopilot({ ...baseCopilot, id: "alpha", dispatcher: "round-robin" });
+    const c2 = defineCopilot({ ...baseCopilot, id: "beta", dispatcher: "round-robin" });
+    const rt = new CopilotRuntime({ provider, agent: makeAgent("ok"), copilots: [c1, c2], onResponse });
+    await rt.activate("alpha");
+    await rt.activate("beta");
+
+    // Three DISTINCT frames from DIFFERENT connections in the SAME room.
+    for (const conn of ["user-A", "user-B", "user-C"]) {
+      provider.emit("room-1", {
+        type: "broadcast",
+        connectionId: conn,
+        event: "question",
+        payload: { text: "hi" },
+      });
+      await new Promise((r) => setTimeout(r, 30));
+    }
+
+    const responders = onResponse.mock.calls.map((c) => c[0] as string);
+    // Exactly ONE responder per frame (not all), rotating per ROOM across
+    // connections. Pre-fix the cursor advanced once per copilot per frame
+    // (degrading to 'all' → 6 responders) and was keyed by connection.
+    expect(responders).toEqual(["alpha", "beta", "alpha"]);
+  });
+
   it("dispatcher 'first-wins' default: only first registered responds", async () => {
     const provider = makeMemoryProvider();
     const onResponse = vi.fn();

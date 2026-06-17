@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- plugin-copilot: the `round-robin` dispatcher now rotates fairly across copilots in a room. The cursor is keyed by room (not by connection) and the dispatch decision is computed once per frame, so exactly one copilot responds per frame and rotation is shared across connections — previously every copilot responded to every frame (round-robin behaved like `all`) (#220)
 - plugin-copilot: a failed queued frame/idle task is now logged with copilot + room context instead of being silently swallowed by an empty catch — the chain stays alive but failures are observable (#222)
 - plugin-copilot: budget accounting is now race-safe. Idle-trigger invocations run through the same per-copilot queue as broadcasts (so they can no longer run concurrently and double-spend), the budget preflight now atomically reserves the estimated cost (check + hold in one step) and reconciles it on completion / releases it on failure (no leaked budget on a failed invocation), and an idle trigger can no longer fire after `deactivate()` (#219, #223, #221)
 - plugin-voice: `<VoiceRecorderBar>` now guards the STT success-response JSON parse — a malformed (non-JSON) 200 body surfaces a specific `VoicePluginError` ("Invalid STT response…") via `onError` instead of throwing an opaque `SyntaxError` (#217)
