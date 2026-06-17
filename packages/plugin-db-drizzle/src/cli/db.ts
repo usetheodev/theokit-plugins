@@ -19,6 +19,12 @@ export interface DbCommand {
   readonly verb: DbVerb;
   readonly summary: string;
   /**
+   * #170: how the runner executes this verb. `"drizzle-kit"` → spawn
+   * `drizzle-kit` with `buildArgs()`. `"user-script"` → run the user's script
+   * (`buildArgs()` returns the script path); drizzle-kit has no such subcommand.
+   */
+  readonly kind: "drizzle-kit" | "user-script";
+  /**
    * #168: destructive verb the runner MUST gate behind an explicit `--force`
    * flag before executing. Enforcement lives in the CLI runner (it has the
    * user's argv); this descriptor only declares the requirement.
@@ -58,9 +64,12 @@ export function buildDbCommands(opts: ResolvedDrizzleDbOptions): DbCommand[] {
   return VERBS.map((verb) => ({
     verb,
     summary: SUMMARIES[verb],
+    // #170: `seed` runs the user's script (drizzle-kit has no `seed` verb);
+    // every other verb is a drizzle-kit passthrough.
+    kind: verb === "seed" ? ("user-script" as const) : ("drizzle-kit" as const),
     // #168: `reset` is destructive (drops the DB) — the runner must require --force.
     ...(verb === "reset" ? { requiresForce: true } : {}),
-    buildArgs: () => baseArgs(verb, opts),
+    buildArgs: () => (verb === "seed" ? seedArgs(opts) : baseArgs(verb, opts)),
   }));
 }
 
@@ -79,6 +88,22 @@ const SUMMARIES: Record<DbVerb, string> = {
  * Shared drizzle-kit invocation prefix for any verb. Subcommands may push
  * verb-specific flags on top (e.g., `reset --force`).
  */
+/**
+ * #170: `seed` runs the user's configured script, not drizzle-kit. Returns the
+ * script path (the runner executes it as a script per `kind:"user-script"`).
+ * Throws a clear, actionable error when no seed script is configured — fail loud
+ * instead of spawning a nonexistent `drizzle-kit seed` subcommand.
+ */
+function seedArgs(opts: ResolvedDrizzleDbOptions): string[] {
+  if (opts.seedScript === undefined || opts.seedScript.length === 0) {
+    throw new Error(
+      "db seed: no seed script configured. Set `seedScript` on drizzleDb(...) " +
+        "or `package.json#theokit.db.seed` to the path of your seed script.",
+    );
+  }
+  return [opts.seedScript];
+}
+
 /** drizzle-kit's connection flag is `--dialect` (NOT `--driver`); map our driver. */
 const DRIVER_TO_DIALECT: Record<DrizzleDriver, string> = {
   postgres: "postgresql",

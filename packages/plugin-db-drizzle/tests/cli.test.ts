@@ -53,8 +53,8 @@ describe("buildDbCommands (P#5 T2.1) — 7 verbs", () => {
       schemaPath: "./custom/schema.ts",
     });
 
-    // Then: every verb passes --schema to drizzle-kit
-    for (const cmd of buildDbCommands(opts)) {
+    // Then: every drizzle-kit verb passes --schema (seed is a user-script, #170).
+    for (const cmd of buildDbCommands(opts).filter((c) => c.kind === "drizzle-kit")) {
       const args = cmd.buildArgs(opts);
       expect(args[0]).toBe(cmd.verb);
       expect(args).toContain("--schema");
@@ -78,6 +78,32 @@ describe("buildDbCommands (P#5 T2.1) — 7 verbs", () => {
     const args = generate?.buildArgs(opts) ?? [];
     expect(args).toContain("--out");
     expect(args).toContain("./drizzle/migrations");
+  });
+
+  it("test_seed_runs_user_script (#170)", () => {
+    // `drizzle-kit seed` does not exist — seed must run the user's configured
+    // script, flagged kind:"user-script" so the runner spawns it as a script.
+    const opts = resolveOptions({ driver: "sqlite", url: ":memory:", seedScript: "./db/seed.ts" });
+    const seed = buildDbCommands(opts).find((c) => c.verb === "seed")!;
+    expect(seed.kind).toBe("user-script");
+    const args = seed.buildArgs(opts);
+    expect(args).toContain("./db/seed.ts");
+    // NOT the old drizzle-kit passthrough shape.
+    expect(args).not.toContain("seed");
+    expect(args).not.toContain("--schema");
+  });
+
+  it("test_seed_throws_when_no_script_configured (#170)", () => {
+    const opts = resolveOptions({ driver: "sqlite", url: ":memory:" }); // no seedScript
+    const seed = buildDbCommands(opts).find((c) => c.verb === "seed")!;
+    expect(() => seed.buildArgs(opts)).toThrow(/seed.*script/i);
+  });
+
+  it("drizzle-kit verbs are kind:'drizzle-kit' (#170)", () => {
+    const opts = resolveOptions({ driver: "sqlite", url: ":memory:" });
+    for (const verb of ["generate", "migrate", "push", "studio", "check", "reset"] as DbVerb[]) {
+      expect(buildDbCommands(opts).find((c) => c.verb === verb)?.kind).toBe("drizzle-kit");
+    }
   });
 
   it("test_connection_opts_forwarded_to_drizzle_kit (#169)", () => {
@@ -124,9 +150,9 @@ describe("buildDbCommands (P#5 T2.1) — 7 verbs", () => {
       migrationsPath: "./drizzle/migrations",
     });
 
-    // Then: only `generate` writes; runtime verbs (migrate/push/studio/seed/check/reset)
-    // don't need --out
-    for (const verb of ["migrate", "push", "studio", "reset", "seed", "check"] as DbVerb[]) {
+    // Then: only `generate` writes; other drizzle-kit verbs don't need --out.
+    // (seed is a user-script, #170 — excluded from the drizzle-kit arg shape.)
+    for (const verb of ["migrate", "push", "studio", "reset", "check"] as DbVerb[]) {
       const cmd = buildDbCommands(opts).find((c) => c.verb === verb);
       const args = cmd?.buildArgs(opts) ?? [];
       expect(args).not.toContain("--out");

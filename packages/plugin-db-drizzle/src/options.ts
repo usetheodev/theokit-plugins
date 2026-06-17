@@ -35,6 +35,13 @@ export interface DrizzleDbOptions {
    * Default: `true`. Pass `false` to suppress the tab entirely.
    */
   devtoolsTab?: boolean;
+  /**
+   * Path to the user's seed script run by `db seed` (#170). `drizzle-kit` has
+   * no `seed` verb, so seeding runs THIS script. Typically resolved at
+   * register-time from `package.json#theokit.db.seed`; can also be set here.
+   * When unset, `db seed` errors instead of invoking a nonexistent subcommand.
+   */
+  seedScript?: string;
 }
 
 /**
@@ -47,6 +54,7 @@ export interface ResolvedDrizzleDbOptions {
   readonly schemaPath: string;
   readonly migrationsPath: string;
   readonly devtoolsTab: boolean;
+  readonly seedScript: string | undefined;
 }
 
 const DEFAULT_SCHEMA_PATH = "./db/schema.ts";
@@ -68,5 +76,6 @@ export function resolveOptions(opts: DrizzleDbOptions): ResolvedDrizzleDbOptions
     schemaPath: opts.schemaPath ?? DEFAULT_SCHEMA_PATH,
     migrationsPath: opts.migrationsPath ?? DEFAULT_MIGRATIONS_PATH,
     devtoolsTab: opts.devtoolsTab ?? true,
+    seedScript: opts.seedScript,
   };
 }
