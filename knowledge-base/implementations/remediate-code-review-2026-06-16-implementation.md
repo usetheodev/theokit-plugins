@@ -55,8 +55,8 @@ Per-task detail (Files to edit, TDD, Acceptance, Concurrency tests, Failure scen
 | T7.3 | Phase 7 | `seed` runs the user seed script (#170) | committed | ✓ | defer | n/a | 1ba8408 |
 | T7.4 | Phase 7 | Fix the no-op CLI conflict guard (#171) | committed | ✓ | defer | n/a | e91aefe |
 | T7.5 | Phase 7 | Devtools iframe sandbox + studioUrl from options (#206, #207) | committed | ✓ | defer | n/a | 2c2b237 |
-| T8.1 | Phase 8 | Email: real happy-path render test (#228) | pending | — | — | — | — |
-| T8.2 | Phase 8 | Forms: test the real component, not a copy (#227) | pending | — | — | — | — |
+| T8.1 | Phase 8 | Email: real happy-path render test (#228) | committed | n/a | n/a | n/a | 1b773cb |
+| T8.2 | Phase 8 | Forms: test the real component, not a copy (#227) | committed | ✓ | defer | n/a | 9c99e77 |
 | T9.1 | Phase 9 | Reduce CC of the 8 flagged functions (#182,#183,#184,#185,#186,#187,#188,#189) | pending | — | — | — | — |
 
 Status legend: pending / red / green / refactor / wired / committed / blocked.

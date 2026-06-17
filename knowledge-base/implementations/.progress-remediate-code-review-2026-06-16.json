@@ -920,6 +920,52 @@
     "commit"
    ],
    "note": "#206 sandbox 'allow-scripts' only (dropped allow-same-origin escape pair; studio is cross-origin); #207 studioUrl from studioHost/studioPort options (default localhost:4983). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T8.1",
+   "task_id": "T8.1",
+   "phase": 8,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "n/a",
+    "c": "n/a"
+   },
+   "commit_sha": "1b773cb",
+   "files": [
+    "packages/plugin-email/tests/render-react-email.test.ts"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "commit"
+   ],
+   "note": "#228 test-only: happy-path mocks @react-email/render (real render coverage); missing-dep mocks import reject (env-independent, no longer asserts dep ABSENT). vi.doMock+resetModules+doUnmock. mock approach (no devDep). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T8.2",
+   "task_id": "T8.2",
+   "phase": 8,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "9c99e77",
+   "files": [
+    "packages/plugin-forms/src/components/TheoForm.tsx",
+    "packages/plugin-forms/tests/unit/TheoForm.test.tsx",
+    ".changeset/forms-extract-error-routing.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#227 extracted routeActionError/extractFieldsFromError as exported single source; handleValid calls it; test imports it (removed duplicated catch-block copy). behavior identical. SEPA pre-COMMIT GO."
   }
  ]
 }
