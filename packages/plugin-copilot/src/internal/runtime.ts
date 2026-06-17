@@ -127,6 +127,14 @@ export class CopilotRuntime {
     await reg.member.leave();
     this.evaluator.clearRoom(reg.descriptor.room.id);
     this.registry.delete(id);
+    // #F-arch-2 (ADR D2): prune the per-room round-robin state ONLY when the
+    // room has no remaining copilots — otherwise sibling rotation would reset.
+    // Checked AFTER registry.delete so the removed copilot is not counted.
+    const roomId = reg.descriptor.room.id;
+    if (this.copilotsInRoom(roomId).length === 0) {
+      this.roundRobinCursor.delete(roomId);
+      this.roundRobinDecision.delete(roomId);
+    }
     return true;
   }
 

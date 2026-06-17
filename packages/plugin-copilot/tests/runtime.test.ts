@@ -254,6 +254,43 @@ describe("CopilotRuntime", () => {
     expect(responders).toEqual(["alpha", "beta", "alpha"]);
   });
 
+  it("test_round_robin_cursor_pruned_when_room_empties (#F-arch-2)", async () => {
+    // F-arch-2: roundRobinCursor/roundRobinDecision must be pruned when a room
+    // empties, so a later re-registration starts rotation fresh (no unbounded
+    // leak + no stale cursor). Asserted via observable rotation behavior — NOT a
+    // private-map accessor (rules/testing.md §6). Two copilots are needed to
+    // exercise the cursor: the single-copilot fast-path bypasses it.
+    const provider = makeMemoryProvider();
+    const onResponse = vi.fn();
+    const c1 = defineCopilot({ ...baseCopilot, id: "alpha", dispatcher: "round-robin" });
+    const c2 = defineCopilot({ ...baseCopilot, id: "beta", dispatcher: "round-robin" });
+    const rt = new CopilotRuntime({ provider, agent: makeAgent("ok"), copilots: [c1, c2], onResponse });
+    await rt.activate("alpha");
+    await rt.activate("beta");
+
+    // Frame 1 → alpha (cursor for room-1 advances to 1).
+    provider.emit("room-1", { type: "broadcast", connectionId: "u1", event: "question", payload: { text: "hi" } });
+    await new Promise((r) => setTimeout(r, 30));
+
+    // Empty the room — both copilots unregister.
+    await rt.unregisterCopilot("alpha");
+    await rt.unregisterCopilot("beta");
+
+    // Re-register two fresh copilots in the SAME room.
+    rt.registerCopilot(defineCopilot({ ...baseCopilot, id: "delta", dispatcher: "round-robin" }));
+    rt.registerCopilot(defineCopilot({ ...baseCopilot, id: "epsilon", dispatcher: "round-robin" }));
+    await rt.activate("delta");
+    await rt.activate("epsilon");
+    onResponse.mockClear();
+
+    // Frame 2 → with a pruned cursor (reset to 0) the FIRST-registered (delta)
+    // responds. Pre-fix the stale cursor=1 (1 % 2) would make epsilon respond.
+    provider.emit("room-1", { type: "broadcast", connectionId: "u2", event: "question", payload: { text: "hi" } });
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(onResponse.mock.calls.map((c) => c[0] as string)).toEqual(["delta"]);
+  });
+
   it("dispatcher 'first-wins' default: only first registered responds", async () => {
     const provider = makeMemoryProvider();
     const onResponse = vi.fn();
