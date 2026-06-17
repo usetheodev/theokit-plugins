@@ -1,0 +1,4 @@
+# SEPA pre-RED — iter 5 — T3.1 (F-arch-1/F-sec-1)
+Config: DOMPurify.sanitize(input,{USE_PROFILES:{html:true},FORBID_TAGS:['meta','script','iframe','object','embed'],FORBID_ATTR:['formaction'],ALLOW_DATA_ATTR:false,ALLOW_UNKNOWN_PROTOCOLS:false}). No hook (HTML default policy handles on*/js:). Sync, snapshot DOMPurify.removed immediately.
+Verdict: classifyRemoved(removed) then OR-fold ALL dangerous flags into removedScript (preserves enforceArtifactSecurity html-kind contract WITHOUT touching schema.ts — in-scope). Add `meta:'removedScript'` to REMOVED_ELEMENT_FLAG (inert for SVG).
+RED: A) unquoted <meta http-equiv=refresh content=0> -> removedScript true (headline; regex needs quotes -> genuine RED). B) iframe srcdoc -> removedScript true. C) on-handler -> removedScript true. Clean HTML -> all false (born-GREEN no-false-positive, separate assertion). SEPA GO.

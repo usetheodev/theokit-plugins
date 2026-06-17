@@ -21,6 +21,24 @@ interface BudgetState {
 }
 
 /**
+ * Token returned by {@link BudgetBridge.reserve} (#219 / EC-2). Holds the
+ * estimated cost in the budget at preflight (atomic check + hold) and is later
+ * settled exactly once via {@link BudgetBridge.reconcile} (success → adjust to
+ * actual) or {@link BudgetBridge.release} (failure → give the hold back).
+ *
+ * @internal
+ */
+export interface BudgetReservation {
+  readonly copilotId: string;
+  readonly roomId: string;
+  readonly estimatedUsd: number;
+  /** Window epochs captured at reserve, so settle can detect a window reset. */
+  dayStartMs: number;
+  monthStartMs: number;
+  settled: boolean;
+}
+
+/**
  * Per-copilot-per-room budget tracker.
  *
  * @internal
@@ -64,9 +82,18 @@ export class BudgetBridge {
    */
   preflightCheck(copilotId: string, roomId: string, estimatedUsd: number): void {
     if (this.config === undefined || this.config.perRoom === undefined) return;
-    const lim = this.config.perRoom;
     const s = this.getOrInitState(this.getKey(copilotId, roomId));
+    this.assertWithinLimits(s, estimatedUsd);
+  }
 
+  /**
+   * Shared limit check (DRY across {@link preflightCheck} and {@link reserve}).
+   * Throws {@link CopilotError} with a stable code if `estimatedUsd` would push
+   * any limit over. No mutation.
+   */
+  private assertWithinLimits(s: BudgetState, estimatedUsd: number): void {
+    const lim = this.config?.perRoom;
+    if (lim === undefined) return;
     if (lim.perRequestUsd !== undefined && estimatedUsd > lim.perRequestUsd) {
       throw new CopilotError(
         `Budget perRequestUsd ${lim.perRequestUsd} exceeded by estimate ${estimatedUsd.toFixed(4)}`,
@@ -84,6 +111,73 @@ export class BudgetBridge {
         `Budget monthlyUsd ${lim.monthlyUsd} exceeded by estimate ${estimatedUsd.toFixed(4)} (used ${s.monthlyUsedUsd.toFixed(4)})`,
         { code: "budget_monthly_exceeded" },
       );
+    }
+  }
+
+  /**
+   * #219 / #223: atomically check limits AND hold `estimatedUsd` in one
+   * synchronous critical section (single window read, no await between check and
+   * mutate), so two concurrent invocations cannot both pass a stale preflight.
+   * Returns a reservation that MUST be settled via {@link reconcile} (success)
+   * or {@link release} (failure) — see EC-2.
+   */
+  reserve(copilotId: string, roomId: string, estimatedUsd: number): BudgetReservation {
+    const reservation: BudgetReservation = {
+      copilotId,
+      roomId,
+      estimatedUsd,
+      dayStartMs: 0,
+      monthStartMs: 0,
+      settled: false,
+    };
+    if (this.config === undefined || this.config.perRoom === undefined) return reservation;
+    const s = this.getOrInitState(this.getKey(copilotId, roomId));
+    this.assertWithinLimits(s, estimatedUsd); // throws → nothing held, no token to settle
+    // Atomic hold — no await between the check above and these writes.
+    s.dailyUsedUsd += estimatedUsd;
+    s.monthlyUsedUsd += estimatedUsd;
+    reservation.dayStartMs = s.dayStartMs;
+    reservation.monthStartMs = s.monthStartMs;
+    return reservation;
+  }
+
+  /**
+   * Settle a reservation with the actual cost on success (#174 wires the real
+   * actual; until then the caller passes the estimate). Replaces the held
+   * estimate with the actual. Idempotent (settled-once). Never drives a window
+   * negative; if the window reset since reserve, the held estimate is gone so
+   * only the actual is counted.
+   */
+  reconcile(reservation: BudgetReservation, actualUsd: number): void {
+    if (reservation.settled) return;
+    reservation.settled = true;
+    if (this.config === undefined || this.config.perRoom === undefined) return;
+    const s = this.getOrInitState(this.getKey(reservation.copilotId, reservation.roomId));
+    const dailyDelta =
+      s.dayStartMs === reservation.dayStartMs ? actualUsd - reservation.estimatedUsd : actualUsd;
+    const monthlyDelta =
+      s.monthStartMs === reservation.monthStartMs
+        ? actualUsd - reservation.estimatedUsd
+        : actualUsd;
+    s.dailyUsedUsd = Math.max(0, s.dailyUsedUsd + dailyDelta);
+    s.monthlyUsedUsd = Math.max(0, s.monthlyUsedUsd + monthlyDelta);
+  }
+
+  /**
+   * Release a reservation on failure/cancellation (EC-2) — gives the held
+   * estimate back so a failed invocation does not leak budget. Idempotent.
+   */
+  release(reservation: BudgetReservation): void {
+    if (reservation.settled) return;
+    reservation.settled = true;
+    if (this.config === undefined || this.config.perRoom === undefined) return;
+    const s = this.getOrInitState(this.getKey(reservation.copilotId, reservation.roomId));
+    // Only give back the hold if the window it was made in is still current.
+    if (s.dayStartMs === reservation.dayStartMs) {
+      s.dailyUsedUsd = Math.max(0, s.dailyUsedUsd - reservation.estimatedUsd);
+    }
+    if (s.monthStartMs === reservation.monthStartMs) {
+      s.monthlyUsedUsd = Math.max(0, s.monthlyUsedUsd - reservation.estimatedUsd);
     }
   }
 

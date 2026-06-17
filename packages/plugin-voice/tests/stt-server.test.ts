@@ -145,4 +145,77 @@ describe('handleSttRequest', () => {
       expect(await res.text()).toMatch(/UPSTREAM_PARSE/)
     })
   })
+
+  describe('upstream error body not reflected (#214)', () => {
+    it('test_upstream_error_body_not_reflected', async () => {
+      const secret = 'SENSITIVE-PROVIDER-INTERNALS-key-leak-xyz'
+      const fetchImpl = vi.fn(() =>
+        Promise.resolve(new Response(secret, { status: 500, statusText: 'Internal Server Error' })),
+      )
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      try {
+        const res = await handleSttRequest(makeBlobInput(), sttConfig, { fetchImpl })
+        expect(res.status).toBe(502) // 5xx → 502
+        const text = await res.text()
+        // Raw upstream body must NOT be reflected to the client.
+        expect(text).not.toContain(secret)
+        // A correlation id is returned to the client for support...
+        expect(text).toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+        // ...and the raw body is logged server-side (with the same id).
+        const logged = errSpy.mock.calls.flat().join(' ')
+        expect(logged).toContain(secret)
+      } finally {
+        errSpy.mockRestore()
+      }
+    })
+  })
+
+  describe('timeout / abort (#211)', () => {
+    it('test_stt_times_out_with_504_and_signal', async () => {
+      // Deterministic: a pre-aborted client signal must surface as 504
+      // UPSTREAM_TIMEOUT, and the handler MUST pass an AbortSignal to fetch.
+      const fetchImpl = vi.fn((_url: string | URL, init: RequestInit) => {
+        if (init.signal?.aborted) {
+          return Promise.reject(init.signal.reason ?? new DOMException('aborted', 'AbortError'))
+        }
+        // Pre-fix code passes no signal → reaches here → 200 → test fails fast.
+        return Promise.resolve(
+          new Response(JSON.stringify({ text: 'unused' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      })
+      const controller = new AbortController()
+      controller.abort()
+      const res = await handleSttRequest(makeBlobInput(), sttConfig, {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        signal: controller.signal,
+      })
+      expect(res.status).toBe(504)
+      expect((await res.json()).error.code).toBe('UPSTREAM_TIMEOUT')
+      expect(fetchImpl.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal)
+    })
+
+    it('test_stt_client_signal_propagated_to_fetch', async () => {
+      let captured: AbortSignal | undefined
+      const fetchImpl = vi.fn((_url: string | URL, init: RequestInit) => {
+        captured = init.signal ?? undefined
+        return Promise.resolve(
+          new Response(JSON.stringify({ text: 'ok' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      })
+      const controller = new AbortController()
+      await handleSttRequest(makeBlobInput(), sttConfig, {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        signal: controller.signal,
+      })
+      controller.abort()
+      // The composed signal handed to fetch reflects the client abort.
+      expect(captured?.aborted).toBe(true)
+    })
+  })
 })

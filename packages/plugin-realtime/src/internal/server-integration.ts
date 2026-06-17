@@ -61,6 +61,13 @@ export type RealtimeSubscriptionOutput =
   | { type: "yjs-update"; connectionId: string; bytes: string }
   | { type: "yjs-awareness"; connectionId: string; bytes: string };
 
+/**
+ * Max frames buffered per subscription before the connection is disconnected
+ * (#195 bounded queue). A consumer that cannot keep up is dropped so it
+ * reconnects and resyncs, rather than letting the server buffer grow unbounded.
+ */
+const MAX_QUEUED_FRAMES = 1024;
+
 function encodeBytes(bytes: Uint8Array): string {
   // Buffer is available in Node + theokit's Node-canonical v0.1 deploy story.
   return Buffer.from(bytes).toString("base64");
@@ -184,13 +191,46 @@ export function mountRealtime(opts: MountRealtimeOptions): MountedRealtime {
       let waiter: ((v: void) => void) | null = null;
       let stopped = false;
 
-      const onFrame = (frame: RealtimeFrame): void => {
-        queue.push(frameToOutput(frame));
+      const wake = (): void => {
         if (waiter !== null) {
           waiter();
           waiter = null;
         }
       };
+
+      const onFrame = (frame: RealtimeFrame): void => {
+        // #198: once aborted/stopped, drop frames instead of enqueuing — a
+        // disconnected consumer must not keep growing the buffer.
+        if (stopped) return;
+        // #195: bound the queue. A consumer that never drains (slow/gone) would
+        // otherwise grow it without limit (memory DoS). On overflow, stop and
+        // disconnect so the client reconnects + resyncs rather than silently
+        // losing CRDT frames.
+        if (queue.length >= MAX_QUEUED_FRAMES) {
+          stopped = true;
+          wake();
+          ctx.disconnect(1013, "realtime: server frame queue overflow");
+          return;
+        }
+        queue.push(frameToOutput(frame));
+        wake();
+      };
+
+      const onAbort = (): void => {
+        stopped = true;
+        wake();
+      };
+
+      // #195: an already-aborted signal at entry means nothing was acquired yet —
+      // exit before handleConnection so there is no handle to leak. This guard
+      // MUST stay BEFORE the addEventListener below: returning after registering
+      // would leak the listener (nothing removes it on this early-return path).
+      if (ctx.signal.aborted) return;
+      // #195: register BEFORE `await handleConnection` so an abort DURING that
+      // await is observed (addEventListener with {once} does NOT fire on a
+      // signal that is already aborted, so registering after the await would
+      // miss it and block the generator forever, leaking the handle).
+      ctx.signal.addEventListener("abort", onAbort, { once: true });
 
       let handle: Awaited<ReturnType<typeof opts.runtime.handleConnection>>;
       try {
@@ -203,20 +243,9 @@ export function mountRealtime(opts: MountRealtimeOptions): MountedRealtime {
       } catch (cause) {
         // Surface as error frame via G8 (the runtime fanned `joined` event
         // but handleConnection rejected — propagate so SDK emits error frame).
+        ctx.signal.removeEventListener("abort", onAbort); // no listener leak on failure
         throw cause;
       }
-
-      ctx.signal.addEventListener(
-        "abort",
-        () => {
-          stopped = true;
-          if (waiter !== null) {
-            waiter();
-            waiter = null;
-          }
-        },
-        { once: true },
-      );
 
       try {
         while (!stopped) {
@@ -231,6 +260,9 @@ export function mountRealtime(opts: MountRealtimeOptions): MountedRealtime {
           yield next;
         }
       } finally {
+        // #195: release the handle AND drop the abort listener — both leak
+        // per-connection without this (the listener outlives the generator).
+        ctx.signal.removeEventListener("abort", onAbort);
         await handle.release();
       }
     };

@@ -186,4 +186,67 @@ describe('handleTtsRequest', () => {
       expect(await res.text()).toMatch(/UPSTREAM_EMPTY/)
     })
   })
+
+  describe('upstream error body not reflected (#214)', () => {
+    it('test_upstream_error_body_not_reflected', async () => {
+      const secret = 'SENSITIVE-TTS-PROVIDER-INTERNALS-leak-xyz'
+      const fetchImpl = vi.fn(() =>
+        Promise.resolve(new Response(secret, { status: 500, statusText: 'Internal Server Error' })),
+      )
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      try {
+        const res = await handleTtsRequest({ text: 'hi' }, ttsConfig, {
+          fetchImpl: fetchImpl as unknown as typeof fetch,
+        })
+        expect(res.status).toBe(502)
+        const text = await res.text()
+        expect(text).not.toContain(secret)
+        expect(text).toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+        const logged = errSpy.mock.calls.flat().join(' ')
+        expect(logged).toContain(secret)
+      } finally {
+        errSpy.mockRestore()
+      }
+    })
+  })
+
+  describe('timeout / abort (#212)', () => {
+    it('test_tts_times_out_and_cancels_stream_on_abort', async () => {
+      // Deterministic: a pre-aborted client signal → 504 UPSTREAM_TIMEOUT, and an
+      // AbortSignal is handed to fetch. NOTE: the real upstream *body* cancellation
+      // on a mid-stream client abort is undici behavior (signal propagated to the
+      // real fetch) — exercised by integration, not provable by this mock; here we
+      // verify only the contract the handler owns: signal propagation + 504.
+      const fetchImpl = vi.fn((_url: string | URL, init: RequestInit) => {
+        if (init.signal?.aborted) {
+          return Promise.reject(init.signal.reason ?? new DOMException('aborted', 'AbortError'))
+        }
+        return Promise.resolve(new Response(makeAudioStream([new Uint8Array([1])]), { status: 200 }))
+      })
+      const controller = new AbortController()
+      controller.abort()
+      const res = await handleTtsRequest({ text: 'hi' }, ttsConfig, {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        signal: controller.signal,
+      })
+      expect(res.status).toBe(504)
+      expect((await res.json()).error.code).toBe('UPSTREAM_TIMEOUT')
+      expect(fetchImpl.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal)
+    })
+
+    it('test_tts_client_signal_propagated_to_fetch', async () => {
+      let captured: AbortSignal | undefined
+      const fetchImpl = vi.fn((_url: string | URL, init: RequestInit) => {
+        captured = init.signal ?? undefined
+        return Promise.resolve(new Response(makeAudioStream([new Uint8Array([1])]), { status: 200 }))
+      })
+      const controller = new AbortController()
+      await handleTtsRequest({ text: 'hi' }, ttsConfig, {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        signal: controller.signal,
+      })
+      controller.abort()
+      expect(captured?.aborted).toBe(true)
+    })
+  })
 })

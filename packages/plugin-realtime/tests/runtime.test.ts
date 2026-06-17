@@ -103,4 +103,28 @@ describe("RealtimeRuntime", () => {
       rt.dispatchFrame("cursor", "c1", { kind: "yjs-update", bytes: new Uint8Array(0) }),
     ).resolves.toBeUndefined();
   });
+
+  it("test_yjs_room_without_provider_support_errors", async () => {
+    // #197: a room that declares storage:"yjs" but is wired to a provider with
+    // no applyYjsUpdate must FAIL LOUDLY (Rule 8) — silently dropping the frame
+    // hides the misconfiguration and loses CRDT state.
+    const provider = createMemoryRealtimeProvider(); // no applyYjsUpdate
+    const yjsRoom = defineRoom({
+      id: "doc",
+      presence: z.object({}).partial(),
+      broadcast: z.object({ kind: z.literal("x") }),
+      storage: "yjs",
+    });
+    const rt = new RealtimeRuntime({ provider, rooms: [yjsRoom] });
+    await rt.handleConnection("doc", { connectionId: "c1" }, undefined, () => {
+      /* frames ignored */
+    });
+
+    await expect(
+      rt.dispatchFrame("doc", "c1", { kind: "yjs-update", bytes: new Uint8Array([1, 2, 3]) }),
+    ).rejects.toMatchObject({ code: "yjs_provider_unsupported" });
+    await expect(
+      rt.dispatchFrame("doc", "c1", { kind: "yjs-awareness", bytes: new Uint8Array([1, 2, 3]) }),
+    ).rejects.toMatchObject({ code: "yjs_provider_unsupported" });
+  });
 });

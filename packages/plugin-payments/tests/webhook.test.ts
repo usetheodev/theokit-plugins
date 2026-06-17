@@ -89,7 +89,7 @@ describe("defineStripeWebhook + WebhookRegistry (P#6 T2.1)", () => {
     expect(order).toEqual(["second", "first"]);
   });
 
-  it("handler throwing propagates the error to the dispatcher caller", async () => {
+  it("handler throwing propagates the error (as an AggregateError) to the caller", async () => {
     const registry = new WebhookRegistry();
     registry.register(
       defineStripeWebhook("checkout.session.completed", async () => {
@@ -97,9 +97,14 @@ describe("defineStripeWebhook + WebhookRegistry (P#6 T2.1)", () => {
       }),
     );
 
-    await expect(
-      registry.dispatch(fakeEvent("checkout.session.completed")),
-    ).rejects.toThrow("user handler failed");
+    // T2.3 (#208): dispatch always throws a uniform AggregateError on failure
+    // (even for a single handler) so the HTTP layer handles ONE error shape.
+    const thrown = await registry
+      .dispatch(fakeEvent("checkout.session.completed"))
+      .catch((e: unknown) => e);
+    expect(thrown).toBeInstanceOf(AggregateError);
+    expect((thrown as AggregateError).errors).toHaveLength(1);
+    expect(((thrown as AggregateError).errors[0] as Error).message).toBe("user handler failed");
   });
 
   it("hasHandlersFor reports registration state", () => {
@@ -134,15 +139,16 @@ describe("defineStripeWebhook + WebhookRegistry (P#6 T2.1)", () => {
     expect(handler3).toHaveBeenCalledOnce();
   });
 
-  it("T3.5: dispatch throws first error (LIFO order), not AggregateError", async () => {
+  // T2.3 (#208) — dispatch now AGGREGATES all handler errors into an
+  // AggregateError instead of throwing only the first and console.error-ing the
+  // rest (which silently lost failures). Run-all is preserved; every error surfaces.
+  it("aggregates all handler errors into an AggregateError (#208)", async () => {
     const registry = new WebhookRegistry();
-    // First registered = runs last in LIFO
     registry.register(
       defineStripeWebhook("checkout.session.completed", async () => {
         throw new Error("handler-1-fail");
       }),
     );
-    // Second registered = runs first in LIFO
     registry.register(
       defineStripeWebhook("checkout.session.completed", async () => {
         throw new Error("handler-2-fail");
@@ -153,43 +159,10 @@ describe("defineStripeWebhook + WebhookRegistry (P#6 T2.1)", () => {
       .dispatch(fakeEvent("checkout.session.completed"))
       .catch((e: unknown) => e);
 
-    // LIFO: handler-2 runs first, so its error is the "first error" thrown
-    expect(thrown).toBeInstanceOf(Error);
-    expect((thrown as Error).message).toBe("handler-2-fail");
-    // Not an AggregateError
-    expect(thrown).not.toBeInstanceOf(AggregateError);
-  });
-
-  it("T3.5: dispatch logs subsequent handler errors", async () => {
-    const registry = new WebhookRegistry();
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    // First registered = runs last in LIFO (subsequent error, logged)
-    registry.register(
-      defineStripeWebhook("checkout.session.completed", async () => {
-        throw new Error("handler-1-fail");
-      }),
-    );
-    // Second registered = runs first in LIFO (first error, re-thrown)
-    registry.register(
-      defineStripeWebhook("checkout.session.completed", async () => {
-        throw new Error("handler-2-fail");
-      }),
-    );
-
-    await registry
-      .dispatch(fakeEvent("checkout.session.completed"))
-      .catch(() => {});
-
-    // The subsequent handler's error (handler-1) should be logged
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("subsequent handler error"),
-      expect.objectContaining({
-        error: expect.any(Error),
-      }),
-    );
-
-    consoleSpy.mockRestore();
+    expect(thrown).toBeInstanceOf(AggregateError);
+    const agg = thrown as AggregateError;
+    const messages = agg.errors.map((e) => (e as Error).message).sort();
+    expect(messages).toEqual(["handler-1-fail", "handler-2-fail"]);
   });
 });
 
@@ -356,7 +329,8 @@ describe("processWebhook (P#6 T2.1 + T2.2 + T2.3 integration)", () => {
     const registry = new WebhookRegistry();
     registry.register(
       defineStripeWebhook("checkout.session.completed", async () => {
-        throw new Error("DB write failed");
+        // Raw handler errors may carry PII/secrets — must NOT reach the boundary.
+        throw new Error("DB write failed: postgres://user:s3cret@db/prod");
       }),
     );
 
@@ -372,7 +346,160 @@ describe("processWebhook (P#6 T2.1 + T2.2 + T2.3 integration)", () => {
     expect(result.status).toBe("handler_error");
     if (result.status === "handler_error") {
       expect(result.eventId).toBe("evt_handler_error");
-      expect((result.error as Error).message).toBe("DB write failed");
+      // #201/D5: boundary error is a sanitized {code,message}, NOT the raw error.
+      expect(result.error.code).toBe("handler_error");
+      expect(result.error.message).not.toContain("DB write failed");
+      expect(result.error.message).not.toContain("s3cret");
     }
+  });
+
+  it("logs the full handler error server-side with secrets redacted (#201)", async () => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe("sk_test_xxx", { apiVersion: "2023-10-16" });
+    const secret = "whsec_xxx";
+    const payload = JSON.stringify({
+      id: "evt_redact_log",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    });
+    const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
+    const registry = new WebhookRegistry();
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("leak whsec_supersecret123 and sk_live_abc999");
+      }),
+    );
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await processWebhook({
+      stripe,
+      rawBody: payload,
+      signatureHeader: header,
+      webhookSecret: secret,
+      registry,
+      store: createMemoryStore(),
+    });
+    expect(spy).toHaveBeenCalled(); // the full error IS logged server-side
+    const logged = spy.mock.calls.map((c) => JSON.stringify(c)).join("\n");
+    expect(logged).not.toContain("whsec_supersecret123");
+    expect(logged).not.toContain("sk_live_abc999");
+    spy.mockRestore();
+  });
+
+  // F-dom-pay-5 — a release() failure whose error carries a credential must be
+  // redacted before hitting the server log, mirroring the handler-error path.
+  it("test_release_error_is_redacted_in_log", async () => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe("sk_test_xxx", { apiVersion: "2023-10-16" });
+    const secret = "whsec_xxx";
+    const payload = JSON.stringify({
+      id: "evt_release_redact",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    });
+    const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
+    const registry = new WebhookRegistry();
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler boom"); // enter the catch → release path
+      }),
+    );
+    // Minimal store: claim is new (true) so the release branch runs; release
+    // throws an error carrying credentials.
+    const leakyStore = {
+      markProcessed: async () => true,
+      release: async () => {
+        throw new Error("release failed whsec_supersecret123 and sk_live_abc999");
+      },
+    } as unknown as Parameters<typeof processWebhook>[0]["store"];
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await processWebhook({
+      stripe,
+      rawBody: payload,
+      signatureHeader: header,
+      webhookSecret: secret,
+      registry,
+      store: leakyStore,
+    });
+    const releaseLogCall = spy.mock.calls.find((c) =>
+      String(c[0]).includes("failed to release idempotency claim"),
+    );
+    expect(releaseLogCall).toBeDefined(); // the release-failure log fired
+    const logged = spy.mock.calls.map((c) => JSON.stringify(c)).join("\n");
+    expect(logged).not.toContain("whsec_supersecret123");
+    expect(logged).not.toContain("sk_live_abc999");
+    expect(logged).toContain("***REDACTED***"); // redaction actually ran
+    spy.mockRestore();
+  });
+
+  // T2.2 (#167) — a throwing handler must leave the event UNMARKED so Stripe's
+  // retry re-runs it. Before the fix, the event was marked before dispatch, so
+  // the retry deduped (duplicate) and the handler never ran again (at-most-once).
+  it("re-invokes a throwing handler on the next delivery (event left unmarked, #167)", async () => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe("sk_test_xxx", { apiVersion: "2023-10-16" });
+    const secret = "whsec_xxx";
+    const payload = JSON.stringify({
+      id: "evt_retry_after_fail",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    });
+    const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
+
+    const registry = new WebhookRegistry();
+    let invocations = 0;
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        invocations += 1;
+        throw new Error("transient DB outage");
+      }),
+    );
+    const store = createMemoryStore(); // SHARED across both deliveries
+
+    const call = () =>
+      processWebhook({ stripe, rawBody: payload, signatureHeader: header, webhookSecret: secret, registry, store });
+
+    const first = await call();
+    const second = await call(); // Stripe retry
+
+    expect(first.status).toBe("handler_error");
+    expect(second.status).toBe("handler_error"); // NOT deduped as a no-op
+    expect(invocations).toBe(2); // handler ran on BOTH deliveries (fails today: 1)
+  });
+
+  // EC-3 — multi-handler partial failure: the whole event is released on any
+  // handler throw, so a retry re-invokes the succeeded handler too. Handlers
+  // MUST therefore be idempotent (documented in defineStripeWebhook).
+  it("re-invokes an already-succeeded handler when a sibling handler throws (EC-3 at-least-once)", async () => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe("sk_test_xxx", { apiVersion: "2023-10-16" });
+    const secret = "whsec_xxx";
+    const payload = JSON.stringify({
+      id: "evt_partial_failure",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    });
+    const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
+
+    const registry = new WebhookRegistry();
+    let aInvocations = 0;
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        aInvocations += 1; // handler A — succeeds
+      }),
+    );
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler B failed"); // handler B — throws
+      }),
+    );
+    const store = createMemoryStore();
+    const call = () =>
+      processWebhook({ stripe, rawBody: payload, signatureHeader: header, webhookSecret: secret, registry, store });
+
+    await call();
+    await call(); // retry
+
+    // A re-runs on the retry (event was released) → A must be idempotent.
+    expect(aInvocations).toBe(2);
   });
 });

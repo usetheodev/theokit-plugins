@@ -248,7 +248,13 @@ export interface CopilotAgentLike {
     local?: { settingSources?: ReadonlyArray<string> };
     systemPrompt?: string;
     maxRetries?: number;
-  }): AsyncIterable<{ type: "partial"; partial: T; attempt: number } | { type: "complete"; object: T }>;
+  }): AsyncIterable<
+    | { type: "partial"; partial: T; attempt: number }
+    // #174: the complete event MAY carry the provider's actual usage/cost so
+    // budget accounting reflects real spend; absent → the runtime falls back to
+    // its configured per-invocation estimate.
+    | { type: "complete"; object: T; usage?: { costUsd?: number } }
+  >;
 
   send?(message: string, opts?: Record<string, unknown>): Promise<{ text: string }>;
 }

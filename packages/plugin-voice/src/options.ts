@@ -22,6 +22,16 @@ import { VoicePluginConfigError } from './errors.js'
  * behind a custom prefix (e.g. `/v1/voice/stt`) without forking.
  */
 
+/**
+ * The OpenAI tts-1 closed voice enum — the SINGLE source of truth (#215).
+ * Imported by `tts-server.ts` (runtime per-request validation) so the schema
+ * default and the server never diverge. `talk-options.tsx` mirrors this list
+ * for its UI dropdown (kept in sync per its own docstring).
+ */
+export const VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const
+
+export type VoiceName = (typeof VALID_VOICES)[number]
+
 const sttSchema = z.object({
   provider: z.enum(['openai', 'groq']).default('openai'),
   apiKey: z.string().min(1).optional(),
@@ -39,7 +49,7 @@ const ttsSchema = z.object({
   apiKey: z.string().min(1).optional(),
   envVar: z.string().min(1).optional(),
   model: z.string().min(1).default('tts-1'),
-  voice: z.string().min(1).default('alloy'),
+  voice: z.enum(VALID_VOICES).default('alloy'),
   endpoint: z
     .string()
     .min(1)

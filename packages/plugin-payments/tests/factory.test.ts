@@ -3,9 +3,10 @@
  *
  * Per plan p6-plugin-payments v1.0 § Phase 1 / T1.2.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { payments } from "../src/index.js";
+import { createMemoryStore } from "../src/idempotency-store.js";
 
 const ENV_KEYS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const;
 const savedEnv: Record<string, string | undefined> = {};
@@ -68,5 +69,42 @@ describe("payments() factory (P#6 T1.2)", () => {
     const plugin = payments({ secretKey: "sk_test_xxx" });
     expect(plugin.options.idempotencyStore).toBeDefined();
     expect(typeof plugin.options.idempotencyStore?.markProcessed).toBe("function");
+  });
+});
+
+describe("payments() default-idempotency-store guard (T2.4 #202)", () => {
+  let savedNodeEnv: string | undefined;
+  beforeEach(() => {
+    savedNodeEnv = process.env.NODE_ENV;
+  });
+  afterEach(() => {
+    if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = savedNodeEnv;
+  });
+
+  it("warns loudly when the default (non-multi-replica-safe) memory store is used in production", () => {
+    process.env.NODE_ENV = "production";
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    payments({ secretKey: "sk_test_xxx" });
+    expect(spy).toHaveBeenCalled();
+    const text = spy.mock.calls.map((c) => String(c[0])).join(" ");
+    expect(text).toMatch(/idempotency|multi-replica/i);
+    spy.mockRestore();
+  });
+
+  it("does NOT warn when an explicit idempotencyStore is supplied in production", () => {
+    process.env.NODE_ENV = "production";
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    payments({ secretKey: "sk_test_xxx", idempotencyStore: createMemoryStore() });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("does NOT warn outside production (default store is fine for dev/test)", () => {
+    process.env.NODE_ENV = "test";
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    payments({ secretKey: "sk_test_xxx" });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

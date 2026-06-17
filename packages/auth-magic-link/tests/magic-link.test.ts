@@ -15,11 +15,13 @@
  */
 
 import type { IncomingMessage } from "node:http";
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMemoryStore,
   createOrmStore,
   magicLink,
+  MagicLinkConfigError,
   type MagicLinkRepository,
   type SendMagicLinkFn,
 } from "../src/index.js";
@@ -285,5 +287,137 @@ describe("magicLink() handleCallback", () => {
     await expect(
       provider.handleCallback(req2, { state: "x", createdAt: 0, expiresAt: 0 }),
     ).rejects.toMatchObject({ code: "invalid_or_expired_token" });
+  });
+});
+
+const sha256hex = (s: string) => createHash("sha256").update(s).digest("hex");
+
+describe("token hashing at rest (T3.1 #191)", () => {
+  it("orm store inserts the token HASH, never the raw token", async () => {
+    const inserts: { token: string }[] = [];
+    const repo: MagicLinkRepository = {
+      async insert(row) {
+        inserts.push(row);
+      },
+      async consumeAtomically() {
+        return null;
+      },
+      async delete() {},
+      async deleteExpired() {
+        return 0;
+      },
+    };
+    const store = createOrmStore(repo);
+    await store.createToken({
+      email: "a@b.co",
+      token: "raw-token-xyz",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    expect(inserts[0]?.token).toBe(sha256hex("raw-token-xyz"));
+    expect(inserts[0]?.token).not.toBe("raw-token-xyz");
+  });
+
+  it("orm store looks up by the token HASH on consume (no plaintext lookup)", async () => {
+    const seen: string[] = [];
+    const repo: MagicLinkRepository = {
+      async insert() {},
+      async consumeAtomically(token) {
+        seen.push(token);
+        return null;
+      },
+      async delete() {},
+      async deleteExpired() {
+        return 0;
+      },
+    };
+    const store = createOrmStore(repo);
+    await store.consumeToken({ token: "raw-abc" });
+    expect(seen[0]).toBe(sha256hex("raw-abc"));
+    expect(seen[0]).not.toBe("raw-abc");
+  });
+
+  it("memory store round-trips by raw token + single-use (hashed storage transparent to callers)", async () => {
+    const store = createMemoryStore();
+    await store.createToken({
+      email: "a@b.co",
+      token: "plain",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    expect((await store.consumeToken({ token: "plain" }))?.email).toBe("a@b.co");
+    expect(await store.consumeToken({ token: "plain" })).toBeNull();
+  });
+});
+
+describe("magicLink() input hardening (T3.2 #204/#209/#205)", () => {
+  const sendEmail = () => vi.fn().mockResolvedValue(undefined) as SendMagicLinkFn & ReturnType<typeof vi.fn>;
+
+  it("#204: rejects an oversized request body (DoS cap) → invalid_email", async () => {
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "https://myapp.test" });
+    // Body > 16KB with an otherwise-valid email — only the cap should reject it.
+    const body = JSON.stringify({ email: "u@x.co", pad: "a".repeat(20_000) });
+    const req = mockReq({ method: "POST", contentType: "application/json", body });
+    await expect(provider.startSignIn(req)).rejects.toMatchObject({ code: "invalid_email" });
+  });
+
+  it("#209: propagates a stream/transport error instead of swallowing it to null", async () => {
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "https://myapp.test" });
+    // A request whose body stream throws mid-read (e.g. ECONNRESET).
+    const req = {
+      url: "/api/auth/magic-link/start",
+      method: "POST",
+      headers: { host: "myapp.test", "content-type": "application/json" },
+    } as unknown as IncomingMessage;
+    (req as unknown as AsyncIterable<Buffer>)[Symbol.asyncIterator] = async function* () {
+      yield Buffer.from('{"em', "utf8");
+      throw new Error("ECONNRESET");
+    };
+    await expect(provider.startSignIn(req)).rejects.toThrow("ECONNRESET");
+  });
+
+  it("#209: still returns null (→ invalid_email) on malformed JSON (narrowed catch)", async () => {
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "https://myapp.test" });
+    const req = mockReq({ method: "POST", contentType: "application/json", body: "{bad json" });
+    await expect(provider.startSignIn(req)).rejects.toMatchObject({ code: "invalid_email" });
+  });
+
+  it("#205: builds the magic-link URL without a double slash even when base has a trailing slash", async () => {
+    const spy = sendEmail();
+    const provider = magicLink({ store: createMemoryStore(), sendEmail: spy, callbackBaseUrl: "https://myapp.test/" });
+    await provider.startSignIn(mockReq({ url: "/api/auth/magic-link/start?email=u%40x.co" }));
+    const url = spy.mock.calls[0]![0].magicLinkUrl as string;
+    expect(url).not.toContain("//api");
+    expect(url).toMatch(/^https:\/\/myapp\.test\/api\/auth\/magic-link\/callback\?token=/);
+  });
+
+  it("#205: rejects a non-absolute callbackBaseUrl at factory init", () => {
+    expect(() =>
+      magicLink({ store: createMemoryStore(), sendEmail: sendEmail(), callbackBaseUrl: "not-a-url" }),
+    ).toThrow(MagicLinkConfigError);
+  });
+});
+
+describe("magic-link tokens are unbound bearer credentials (T3.1 #190 — cross-device by design)", () => {
+  it("handleCallback succeeds with a mismatched/empty tx.state (cross-device click)", async () => {
+    // The user may click the email link on a DIFFERENT device than the one that
+    // called startSignIn, so no initiating-browser tx.state cookie is present.
+    // The token is a bearer credential (32B entropy + 15min TTL + single-use +
+    // hash-at-rest); tx.state binding is intentionally NOT enforced. This test
+    // guards against a future regression that re-adds OAuth-style state binding
+    // and would break cross-device sign-in. (ADR D6 binding option superseded.)
+    const { provider, store } = makeProvider();
+    await store.createToken({
+      email: "cross@device",
+      token: "cross-device-tok",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    const req = mockReq({
+      url: "/api/auth/magic-link/callback?token=cross-device-tok",
+    });
+    const result = await provider.handleCallback(req, {
+      state: "a-totally-different-browser-state",
+      createdAt: 0,
+      expiresAt: 0,
+    });
+    expect(result.profile.email).toBe("cross@device");
   });
 });

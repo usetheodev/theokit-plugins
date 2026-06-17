@@ -12,12 +12,24 @@
  * presence with an actionable error message.
  */
 
-import type { ResolvedDrizzleDbOptions } from "../options.js";
+import type { DrizzleDriver, ResolvedDrizzleDbOptions } from "../options.js";
 
 /** Per-verb command descriptor. The runner reads these to dispatch CLI args. */
 export interface DbCommand {
   readonly verb: DbVerb;
   readonly summary: string;
+  /**
+   * #170: how the runner executes this verb. `"drizzle-kit"` → spawn
+   * `drizzle-kit` with `buildArgs()`. `"user-script"` → run the user's script
+   * (`buildArgs()` returns the script path); drizzle-kit has no such subcommand.
+   */
+  readonly kind: "drizzle-kit" | "user-script";
+  /**
+   * #168: destructive verb the runner MUST gate behind an explicit `--force`
+   * flag before executing. Enforcement lives in the CLI runner (it has the
+   * user's argv); this descriptor only declares the requirement.
+   */
+  readonly requiresForce?: boolean;
   /** Build the drizzle-kit args array for this verb given resolved options. */
   buildArgs(opts: ResolvedDrizzleDbOptions): string[];
 }
@@ -52,7 +64,12 @@ export function buildDbCommands(opts: ResolvedDrizzleDbOptions): DbCommand[] {
   return VERBS.map((verb) => ({
     verb,
     summary: SUMMARIES[verb],
-    buildArgs: () => baseArgs(verb, opts),
+    // #170: `seed` runs the user's script (drizzle-kit has no `seed` verb);
+    // every other verb is a drizzle-kit passthrough.
+    kind: verb === "seed" ? ("user-script" as const) : ("drizzle-kit" as const),
+    // #168: `reset` is destructive (drops the DB) — the runner must require --force.
+    ...(verb === "reset" ? { requiresForce: true } : {}),
+    buildArgs: () => (verb === "seed" ? seedArgs(opts) : baseArgs(verb, opts)),
   }));
 }
 
@@ -71,6 +88,32 @@ const SUMMARIES: Record<DbVerb, string> = {
  * Shared drizzle-kit invocation prefix for any verb. Subcommands may push
  * verb-specific flags on top (e.g., `reset --force`).
  */
+/**
+ * #170: `seed` runs the user's configured script, not drizzle-kit. Returns the
+ * script path (the runner executes it as a script per `kind:"user-script"`).
+ * Throws a clear, actionable error when no seed script is configured — fail loud
+ * instead of spawning a nonexistent `drizzle-kit seed` subcommand.
+ */
+function seedArgs(opts: ResolvedDrizzleDbOptions): string[] {
+  if (opts.seedScript === undefined || opts.seedScript.length === 0) {
+    throw new Error(
+      "db seed: no seed script configured. Set `seedScript` on drizzleDb(...) " +
+        "or `package.json#theokit.db.seed` to the path of your seed script.",
+    );
+  }
+  return [opts.seedScript];
+}
+
+/** drizzle-kit's connection flag is `--dialect` (NOT `--driver`); map our driver. */
+const DRIVER_TO_DIALECT: Record<DrizzleDriver, string> = {
+  postgres: "postgresql",
+  mysql: "mysql",
+  sqlite: "sqlite",
+};
+
+/** Verbs that open a DB connection and therefore need `--dialect`/`--url` (#169). */
+const CONNECTION_VERBS: ReadonlySet<DbVerb> = new Set(["migrate", "push", "studio", "check"]);
+
 function baseArgs(verb: DbVerb, opts: ResolvedDrizzleDbOptions): string[] {
   const args: string[] = [verb, "--schema", opts.schemaPath];
   // The `out` flag is used by `generate` to write migration files into the
@@ -78,7 +121,17 @@ function baseArgs(verb: DbVerb, opts: ResolvedDrizzleDbOptions): string[] {
   if (verb === "generate") {
     args.push("--out", opts.migrationsPath);
   }
-  // Studio binds to a port — drizzle-kit defaults to 4983 (D2 ADR — pure
-  // passthrough; no plugin-side port hijacking).
+  // #169: forward the documented connection options to drizzle-kit for the verbs
+  // that need a live connection. `generate` only diffs the schema, so it is
+  // intentionally excluded. Each flag is conditional on its source being set —
+  // pushing `--url undefined` would corrupt the arg vector.
+  if (CONNECTION_VERBS.has(verb)) {
+    if (opts.driver !== undefined) {
+      args.push("--dialect", DRIVER_TO_DIALECT[opts.driver]);
+    }
+    if (opts.url !== undefined) {
+      args.push("--url", opts.url);
+    }
+  }
   return args;
 }

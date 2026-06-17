@@ -1,0 +1,1001 @@
+{
+ "tasks": [
+  {
+   "task_id": "T1.1",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "commit_sha": "5564b1b",
+   "id": "T1.1",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/route-handlers.ts",
+    "packages/plugin-canvas/tests/route-handlers.test.ts"
+   ]
+  },
+  {
+   "task_id": "T1.2",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "a557027",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "id": "T1.2",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/schema.ts",
+    "packages/plugin-canvas/tests/schema.test.ts"
+   ]
+  },
+  {
+   "task_id": "T1.3",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "9aad2a1",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "styling-regression logged to followups",
+   "id": "T1.3",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/ui/renderers/mermaid-artifact.tsx",
+    "packages/plugin-canvas/tests/mermaid-artifact.test.tsx"
+   ]
+  },
+  {
+   "task_id": "T1.4",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "01c1e9e",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#186 (Phase 9 sanitize CC) likely resolved here \u2014 re-measure at Phase 9",
+   "id": "T1.4",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/ui/renderers/sanitize.ts",
+    "packages/plugin-canvas/tests/sanitize.test.ts"
+   ]
+  },
+  {
+   "task_id": "T1.5",
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "5a06898",
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "SEPA consults consolidated (trivial no-behavior-change deletion)",
+   "id": "T1.5",
+   "phase": 1,
+   "files": [
+    "packages/plugin-canvas/src/define-artifact-tool.ts"
+   ]
+  },
+  {
+   "id": "T2.1",
+   "task_id": "T2.1",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "b074718",
+   "files": [
+    "packages/plugin-payments/src/currency.ts",
+    "packages/plugin-payments/tests/checkout.test.ts"
+   ],
+   "iterations_used": 1,
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "SEPA caught plan's wrong zero-decimal set (UGX) + 3-decimal 10x undercharge \u2014 both fixed"
+  },
+  {
+   "id": "T2.2",
+   "task_id": "T2.2",
+   "phase": 2,
+   "status": "committed",
+   "reason": "UNBLOCKED by owner: extend IdempotencyStore with release() (claim+release design). Scope merged with part of T2.4.",
+   "files": [
+    "packages/plugin-payments/src/webhook.ts",
+    "packages/plugin-payments/src/idempotency-store.ts",
+    "packages/plugin-payments/tests/webhook.test.ts",
+    "packages/plugin-payments/tests/idempotency-store.test.ts",
+    "packages/plugin-payments/README.md",
+    ".changeset/payments-idempotency-release.md"
+   ],
+   "commit_sha": "0756375",
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "BLOCKED->owner chose claim+release design; merged store-half of T2.4; public interface change (changeset)"
+  },
+  {
+   "id": "T2.3",
+   "task_id": "T2.3",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "7baea9d",
+   "files": [
+    "packages/plugin-payments/src/webhook.ts",
+    "packages/plugin-payments/tests/webhook.test.ts",
+    ".changeset/payments-webhook-error-shape.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#208 AggregateError (uniform) + #201 sanitized boundary + redact log; public error-shape change (changeset)"
+  },
+  {
+   "id": "T2.4",
+   "task_id": "T2.4",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "aa87e8c",
+   "files": [
+    "packages/plugin-payments/src/index.ts",
+    "packages/plugin-payments/tests/factory.test.ts"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "wiring",
+    "commit"
+   ],
+   "note": "advisory warn (EC-13); SEPA consults consolidated (trivial guard)"
+  },
+  {
+   "id": "T2.5",
+   "task_id": "T2.5",
+   "phase": 2,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "2f53469",
+   "files": [
+    "packages/plugin-payments/src/stripe-client.ts",
+    "packages/plugin-payments/tests/stripe-client.test.ts"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "wiring",
+    "commit"
+   ],
+   "note": "SEPA pre-COMMIT unavailable (500 x2) -> self-review performed (low-risk validate-then-narrow guard)"
+  },
+  {
+   "id": "T3.1",
+   "task_id": "T3.1",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "88fbb04",
+   "files": [
+    "packages/auth-magic-link/src/store.ts",
+    "packages/auth-magic-link/src/index.ts",
+    "packages/auth-magic-link/tests/magic-link.test.ts",
+    ".changeset/auth-magic-link-store-schema.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#191 sha256 hash-at-rest both adapters; #190 owner-approved documented-bearer (supersedes ADR D6 false premise)"
+  },
+  {
+   "id": "T3.2",
+   "task_id": "T3.2",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "70eb7a4",
+   "files": [
+    "packages/auth-magic-link/src/index.ts",
+    "packages/auth-magic-link/tests/magic-link.test.ts",
+    ".changeset/auth-magic-link-input-hardening.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ]
+  },
+  {
+   "id": "T3.3",
+   "task_id": "T3.3",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "340b78d",
+   "files": [
+    "packages/auth-google/src/index.ts",
+    "packages/auth-google/tests/google-provider.test.ts",
+    ".changeset/auth-google-oidc-ssrf-hardening.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#192 SSRF: https-or-loopback gate on base + 3 discovered endpoints; env override loopback-only. Deviates from finding sub-fix (c) host-equality (breaks Google multi-host) -> documented. SEPA pre-RED/post-GREEN/pre-COMMIT all GO."
+  },
+  {
+   "id": "T3.4",
+   "task_id": "T3.4",
+   "phase": 3,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "647a6c3",
+   "files": [
+    "packages/auth-github/src/index.ts",
+    "packages/auth-github/tests/github-provider.test.ts",
+    ".changeset/auth-github-emails-failure-surfaced.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#203 fail-loud: emails fetch failure -> GitHubAuthError(emails_fetch_failed); no-verified-email stays null (documented distinction). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T4.1",
+   "task_id": "T4.1",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "962b42e",
+   "files": [
+    "packages/plugin-realtime/src/yjs-provider.ts",
+    "packages/plugin-realtime/tests/yjs-provider-concurrency.test.ts",
+    ".changeset/realtime-yjs-doc-race.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#193 single-flight memo (state.docInit ??=) closes check-then-act race; docInit is single source of truth (dropped doc/awareness fast-path fields); #196 redundant loadYjs removed via bundle. DEVIATION: plan RED prescribed concurrent joinRoom but joinRoom never calls ensureYjs (born-GREEN) -> RED uses concurrent applyYjsUpdate (vi.mock Doc ctor count). GC-during-init orphan deferred to T4.2/#194 (TODO in code). SEPA pre-RED/post-GREEN/pre-COMMIT all GO."
+  },
+  {
+   "id": "T4.2",
+   "task_id": "T4.2",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "be6ec38",
+   "files": [
+    "packages/plugin-realtime/src/yjs-provider.ts",
+    "packages/plugin-realtime/tests/yjs-provider-concurrency.test.ts",
+    ".changeset/realtime-yjs-destroyed-doc-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#194 in-flight refcount defers gcIfEmpty (destroy+evict) while applies run; post-await membership re-check + factory destroy-if-evicted belt. Closes apply-to-destroyed-doc AND the T4.1-deferred GC-during-init orphan in one mechanism. TODO :176-178 removed. SEPA pre-RED/post-GREEN/pre-COMMIT all GO (RED empirically verified failing vs HEAD)."
+  },
+  {
+   "id": "T4.3",
+   "task_id": "T4.3",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "3e7af67",
+   "files": [
+    "packages/plugin-realtime/src/internal/server-integration.ts",
+    "packages/plugin-realtime/tests/server-integration.test.ts",
+    ".changeset/realtime-server-abort-bounded-queue.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#195 abort listener registered before handleConnection await + entry aborted-guard + removeEventListener on catch+finally (no handle/listener leak); bounded queue MAX_QUEUED_FRAMES=1024 -> disconnect(1013) on overflow. #198 onFrame stopped-guard drops post-abort/post-overflow frames. NEW test file (3 tests; 2 RED + 1 honest regression guard). SEPA post-GREEN/pre-COMMIT GO."
+  },
+  {
+   "id": "T4.4",
+   "task_id": "T4.4",
+   "phase": 4,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "ca041df",
+   "files": [
+    "packages/plugin-realtime/src/internal/runtime.ts",
+    "packages/plugin-realtime/tests/runtime.test.ts",
+    ".changeset/realtime-yjs-room-misconfig-loud.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#197 fail-loud: storage:'yjs' room + provider without applyYjsUpdate/applyYjsAwareness -> RealtimeError(yjs_provider_unsupported) instead of silent drop. Non-yjs rooms unchanged (existing no-op test green). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.1",
+   "task_id": "T5.1",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "243e7a6",
+   "files": [
+    "packages/plugin-voice/src/stt-server.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    "packages/plugin-voice/tests/stt-server.test.ts",
+    "packages/plugin-voice/tests/tts-server.test.ts",
+    ".changeset/voice-stt-tts-upstream-timeout.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#211/#212 AbortSignal.timeout(30s default)+AbortSignal.any(client) -> fetch; abort/timeout -> 504 UPSTREAM_TIMEOUT (branch on err.name), network stays 502. undici cancels TTS stream on client abort via signal (not mock-tested; integration). additive opts. SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T5.2",
+   "task_id": "T5.2",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "c3f3a35",
+   "files": [
+    "packages/plugin-voice/src/recorder.ts",
+    "packages/plugin-voice/tests/recorder.test.ts",
+    ".changeset/voice-recorder-error-release.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#213 error event always releaseStream + onError (additive opt) when no stop pending; stop-pending path unchanged. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.3",
+   "task_id": "T5.3",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "db271df",
+   "files": [
+    "packages/plugin-voice/src/stt-server.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    "packages/plugin-voice/tests/stt-server.test.ts",
+    "packages/plugin-voice/tests/tts-server.test.ts",
+    ".changeset/voice-no-upstream-body-reflection.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#214 raw upstream body no longer reflected; logged server-side (console.error, package precedent) under randomUUID correlation id; client gets generic msg + same id. status mapping preserved. SEPA pre-COMMIT GO (corrected lint net-zero via Promise.resolve arrows)."
+  },
+  {
+   "id": "T5.4",
+   "task_id": "T5.4",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "9208043",
+   "files": [
+    "packages/plugin-voice/src/options.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    "packages/plugin-voice/src/ui/talk-options.tsx",
+    "packages/plugin-voice/tests/scaffold.test.ts",
+    ".changeset/voice-unify-tts-voice-enum.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#215 VALID_VOICES single SoT in options.ts (z.enum); tts-server imports it (VOICE_SET); invalid default rejected at construction + compile-time (@ts-expect-error proof). talk-options docstring repointed. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.5",
+   "task_id": "T5.5",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "18fc976",
+   "files": [
+    "packages/plugin-voice/src/ui/use-tts.ts",
+    "packages/plugin-voice/tests/use-tts.test.tsx",
+    ".changeset/voice-use-tts-stale-playback.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#216 per-call controller identity guard (isStale=abortRef.current!==controller) at all post-await checkpoints; stale-after-play tears down OWN audio+url+listeners (removeEventListener must-add per SEPA), no cleanupAudio/no setPhase. listener/cleanupAudio internals out-of-scope (follow-up). SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T5.6",
+   "task_id": "T5.6",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "1d8ee52",
+   "files": [
+    "packages/plugin-voice/src/ui/voice-recorder-bar.tsx",
+    "packages/plugin-voice/tests/voice-recorder-bar.test.tsx",
+    ".changeset/voice-recorder-bar-stt-parse-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#217 res.json() wrapped in try/catch -> VoicePluginError('Invalid STT response') with cause; surfaced via onError. happy path + !res.ok untouched. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T5.7",
+   "task_id": "T5.7",
+   "phase": 5,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "n/a",
+    "c": "n/a"
+   },
+   "commit_sha": "868b64b",
+   "files": [
+    "packages/plugin-voice/src/index.ts"
+   ],
+   "phases_completed": [
+    "green",
+    "commit"
+   ],
+   "note": "#175 doc-only: index.ts docstring corrected to real handler signatures (input,config,opts?). No CHANGELOG/changeset (internal doc, not consumer-facing per Rule 6). typecheck baseline unchanged."
+  },
+  {
+   "id": "T6.1",
+   "task_id": "T6.1",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "33dbbb9",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-prompt-injection-isolation.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#218 framePrompt returns user-role-only fenced content (frameUntrusted strips forged markers); trusted systemPrompt passed separately to streamObject. role separation + framing (OWASP LLM01). all 3 branches de-contaminated. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.2",
+   "task_id": "T6.2",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "34202f8",
+   "files": [
+    "packages/plugin-copilot/src/internal/budget-bridge.ts",
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/budget-bridge.test.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-budget-race-and-idle-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#219/#223/#221/EC-2: idle routed through per-copilot enqueue (serializes w/ broadcast); BudgetBridge reserve(atomic check+hold)/reconcile(actual,clamp,window-epoch)/release(EC-2) with settled-once; reg.active flag flipped first in deactivate + checked in idle task + _handleFrame. reconcile passes est (T6.6 wires real). preflightCheck/charge kept as shims. SEPA pre-RED/post-GREEN+pre-COMMIT GO (2 CRITICALs resolved)."
+  },
+  {
+   "id": "T6.3",
+   "task_id": "T6.3",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "6a6eb0f",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-handleframe-error-logged.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#222 enqueue catch logs copilotId/roomId/error (console.error, package precedent) instead of empty swallow; chain stays alive. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.4",
+   "task_id": "T6.4",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "d04d3bb",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-round-robin-keyed-by-room.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#220 round-robin cursor keyed by roomId (not connectionId) + dispatch-once-per-frame memo (roomId,frame===) so cursor advances 1x/frame -> exactly one responder/frame rotating. DEVIATION: key-only was observable no-op (per-copilot double-advance degraded to 'all'); memo required to satisfy intent (SEPA-vetted, in runtime.ts). SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T6.5",
+   "task_id": "T6.5",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "877a6ee",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-streamobject-real-schema.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#224 real z.object({text:z.string()}) schema passed to streamObject (was passthrough that disabled validation). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.6",
+   "task_id": "T6.6",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "b9f9ea3",
+   "files": [
+    "packages/plugin-copilot/src/types.ts",
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-budget-actual-cost.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#174 complete event gains optional usage.costUsd; runAgent reconciles to actual (finite) else estimate fallback. builds on T6.2 reservation. additive type. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.7",
+   "task_id": "T6.7",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "49aa923",
+   "files": [
+    "packages/plugin-copilot/README.md",
+    "packages/plugin-copilot/tests/react/quickstart.test.tsx",
+    ".changeset/copilot-readme-quickstart-alignment.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "commit"
+   ],
+   "note": "#172/#173 README Quick start aligned to real API (userConnectionId, no runtime prop, object-arg hooks); code was source of truth (no code change). quickstart.test.tsx renders documented path as doc-as-test guard. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T7.1",
+   "task_id": "T7.1",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "30efd06",
+   "files": [
+    "packages/plugin-db-drizzle/src/cli/db.ts",
+    "packages/plugin-db-drizzle/tests/cli.test.ts",
+    ".changeset/db-drizzle-reset-requires-force.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#168 reset flagged requiresForce on DbCommand (descriptor); runner enforces --force (has argv). pure factory can't access user flags - tested surface is the flag. SEPA pre-RED noted reset/seed are fabricated drizzle-kit verbs (separate unflagged concern)."
+  },
+  {
+   "id": "T7.2",
+   "task_id": "T7.2",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "fb9ab0c",
+   "files": [
+    "packages/plugin-db-drizzle/src/cli/db.ts",
+    "packages/plugin-db-drizzle/tests/cli.test.ts",
+    ".changeset/db-drizzle-forward-connection-opts.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#169 forward --dialect(mapped from driver, NOT --driver)/--url for connection verbs (migrate/push/studio/check); generate excluded; undefined guarded. SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T7.3",
+   "task_id": "T7.3",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "1ba8408",
+   "files": [
+    "packages/plugin-db-drizzle/src/cli/db.ts",
+    "packages/plugin-db-drizzle/src/options.ts",
+    "packages/plugin-db-drizzle/tests/cli.test.ts",
+    ".changeset/db-drizzle-seed-runs-user-script.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#170 seed kind:user-script runs seedScript (throws clear error if unset); DbCommand gains kind discriminant; seedScript added to options (pure; register-time package.json read deferred to runner). 2 existing tests updated (encoded old buggy seed-as-passthrough). SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T7.4",
+   "task_id": "T7.4",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "e91aefe",
+   "files": [
+    "packages/plugin-db-drizzle/src/index.ts",
+    "packages/plugin-db-drizzle/tests/register.test.ts",
+    ".changeset/db-drizzle-cli-conflict-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#171 conflict branch now warns+extends (observable) vs silent fresh register; was identical no-op. warn+extend defensible given no getCliCommand API (stronger error-on-dup needs API change, backlog). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T7.5",
+   "task_id": "T7.5",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "2c2b237",
+   "files": [
+    "packages/plugin-db-drizzle/src/devtools.ts",
+    "packages/plugin-db-drizzle/src/options.ts",
+    "packages/plugin-db-drizzle/tests/devtools.test.ts",
+    ".changeset/db-drizzle-devtools-sandbox-and-url.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#206 sandbox 'allow-scripts' only (dropped allow-same-origin escape pair; studio is cross-origin); #207 studioUrl from studioHost/studioPort options (default localhost:4983). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T8.1",
+   "task_id": "T8.1",
+   "phase": 8,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "n/a",
+    "c": "n/a"
+   },
+   "commit_sha": "1b773cb",
+   "files": [
+    "packages/plugin-email/tests/render-react-email.test.ts"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "commit"
+   ],
+   "note": "#228 test-only: happy-path mocks @react-email/render (real render coverage); missing-dep mocks import reject (env-independent, no longer asserts dep ABSENT). vi.doMock+resetModules+doUnmock. mock approach (no devDep). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T8.2",
+   "task_id": "T8.2",
+   "phase": 8,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "9c99e77",
+   "files": [
+    "packages/plugin-forms/src/components/TheoForm.tsx",
+    "packages/plugin-forms/tests/unit/TheoForm.test.tsx",
+    ".changeset/forms-extract-error-routing.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#227 extracted routeActionError/extractFieldsFromError as exported single source; handleValid calls it; test imports it (removed duplicated catch-block copy). behavior identical. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T9.1",
+   "task_id": "T9.1",
+   "phase": 9,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "n/a",
+    "c": "n/a"
+   },
+   "commit_sha": "342239f",
+   "files": [
+    "packages/auth-github/src/index.ts",
+    "packages/plugin-canvas/src/store.ts",
+    "packages/plugin-canvas/src/ui/artifact-actions.ts",
+    "packages/plugin-canvas/src/ui/renderers/sanitize.ts",
+    "packages/plugin-copilot/src/define-copilot.ts",
+    "packages/plugin-realtime/src/react/index.ts",
+    "packages/plugin-voice/src/stt-server.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    ".changeset/reduce-cyclomatic-complexity.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "commit"
+   ],
+   "note": "#182-189 CC reduction via behavior-preserving helper extraction. 6/8 fn CC<=10 clean; serialize(9-kind switch)+memList at idiomatic floor (lizard mis-merges adjacent fns). 453 tests green across 5 pkgs (behavior preserved). 0 new tsc/lint. SELF-REVIEWED in lieu of SEPA (weekly quota exhausted): verified branch order (voice 504-before-502, github fail-loud-before-parse), instanceof-Response early-returns, no helper exported, no test changed. RECOVERY NOTE: a stale git-stash from a lint-check caused a runtime.ts UU conflict mid-T9.1; restored runtime.ts to HEAD (T6 intact, 10 markers) + dropped the stale stash."
+  }
+ ]
+}

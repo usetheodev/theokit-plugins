@@ -81,6 +81,18 @@ export function payments(opts: PaymentsOptions = {}): PaymentsPlugin {
   // Memory store is created lazily so test isolation works (one store per
   // plugin instance). Production consumers SHOULD pass `idempotencyStore`
   // explicitly via `createOrmStore(repo)` for multi-replica safety.
+  // T2.4 (#202): the default memory store is single-process — NOT multi-replica
+  // safe. In production, falling back to it silently risks the same Stripe event
+  // being processed on more than one replica. Warn loudly (advisory: NODE_ENV may
+  // be unset on some runtimes, so this is a best-effort net, not a hard gate).
+  if (resolved.idempotencyStore === undefined && process.env.NODE_ENV === "production") {
+    console.warn(
+      "[plugin-payments] Using the default in-memory idempotency store in production. " +
+        "It is NOT multi-replica safe — the same Stripe webhook event may be processed " +
+        "more than once across replicas. Pass an explicit `idempotencyStore` " +
+        "(e.g. createOrmStore(repo) backed by a UNIQUE event_id) for production deployments.",
+    );
+  }
   const store = resolved.idempotencyStore ?? createMemoryStore();
   const clientGetter = createStripeClientGetter(resolved);
 

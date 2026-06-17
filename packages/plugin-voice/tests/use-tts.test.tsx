@@ -17,6 +17,7 @@ interface FakeAudio {
   play: ReturnType<typeof vi.fn>
   pause: ReturnType<typeof vi.fn>
   addEventListener: ReturnType<typeof vi.fn>
+  removeEventListener: ReturnType<typeof vi.fn>
   __listeners: Map<string, Array<(...args: unknown[]) => void>>
   emit(event: string): void
 }
@@ -31,6 +32,14 @@ function makeAudio(): FakeAudio {
       const arr = listeners.get(type) ?? []
       arr.push(fn)
       listeners.set(type, arr)
+    }),
+    removeEventListener: vi.fn((type: string, fn: (...args: unknown[]) => void) => {
+      const arr = listeners.get(type)
+      if (arr === undefined) return
+      listeners.set(
+        type,
+        arr.filter((f) => f !== fn),
+      )
     }),
     __listeners: listeners,
     emit(event: string) {
@@ -224,5 +233,101 @@ describe('useTts', () => {
     })
     const headers = (capturedInit?.headers ?? {}) as Record<string, string>
     expect(headers['X-Theo-Action']).toBeUndefined()
+  })
+
+  describe('#216 — stale playback must not override newer state', () => {
+    function makeDeferred() {
+      let resolve!: () => void
+      const promise = new Promise<void>((r) => {
+        resolve = r
+      })
+      return { promise, resolve }
+    }
+
+    // Each speak() gets its OWN audio with a play() that resolves on a deferred
+    // we control, so we can force a stale call's play() to resolve LAST.
+    function controllableFactory() {
+      const audios: FakeAudio[] = []
+      const plays: ReturnType<typeof makeDeferred>[] = []
+      const audioFactory = () => {
+        const a = makeAudio()
+        const d = makeDeferred()
+        a.play = vi.fn(() => d.promise)
+        plays.push(d)
+        audios.push(a)
+        return a as unknown as HTMLAudioElement
+      }
+      return { audioFactory, audios, plays }
+    }
+
+    it('test_stale_play_does_not_override_newer_speak', async () => {
+      const fetchImpl = vi.fn(() => Promise.resolve(mp3Response()))
+      const { audioFactory, audios, plays } = controllableFactory()
+      const { result } = renderHook(() => useTts({ fetchImpl, audioFactory }))
+
+      await act(async () => {
+        void result.current.speak('A') // play() hangs on plays[0]
+        await Promise.resolve()
+      })
+      await waitFor(() => expect(audios.length).toBe(1))
+
+      await act(async () => {
+        void result.current.speak('B') // play() hangs on plays[1]
+        await Promise.resolve()
+      })
+      await waitFor(() => expect(audios.length).toBe(2))
+
+      // B's playback starts → phase playing.
+      await act(async () => {
+        plays[1]!.resolve()
+        await Promise.resolve()
+      })
+      await waitFor(() => expect(result.current.phase).toBe('playing'))
+
+      // B finishes → idle.
+      await act(async () => {
+        audios[1]!.emit('ended')
+        await Promise.resolve()
+      })
+      await waitFor(() => expect(result.current.phase).toBe('idle'))
+
+      // NOW the stale A play() resolves LAST — it must NOT flip back to playing.
+      await act(async () => {
+        plays[0]!.resolve()
+        await Promise.resolve()
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(result.current.phase).toBe('idle')
+    })
+
+    it('test_stale_play_does_not_override_after_stop', async () => {
+      const fetchImpl = vi.fn(() => Promise.resolve(mp3Response()))
+      const { audioFactory, audios, plays } = controllableFactory()
+      const { result } = renderHook(() => useTts({ fetchImpl, audioFactory }))
+
+      await act(async () => {
+        void result.current.speak('A')
+        await Promise.resolve()
+      })
+      await waitFor(() => expect(audios.length).toBe(1))
+
+      await act(async () => {
+        result.current.stop()
+        await Promise.resolve()
+      })
+      expect(result.current.phase).toBe('idle')
+
+      // The stale A play() resolves after stop() — must stay idle.
+      await act(async () => {
+        plays[0]!.resolve()
+        await Promise.resolve()
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(result.current.phase).toBe('idle')
+    })
   })
 })

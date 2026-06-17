@@ -29,7 +29,7 @@ import {
   VoicePermissionDeniedError,
   VoicePluginError,
 } from '../errors.js'
-import { createRecorder, type Recorder } from '../recorder.js'
+import { createRecorder, type CreateRecorderOptions, type Recorder } from '../recorder.js'
 
 import { VoiceAlert, type AlertKind } from './alert.js'
 import { MicIcon, RetryIcon, SpinnerIcon, StopIcon } from './icons.js'
@@ -61,8 +61,9 @@ export interface VoiceRecorderBarProps {
   renderError?: (err: VoicePluginError | Error, retry: () => void) => ReactNode
   /** Extra wrapper class for layout integration. */
   className?: string
-  /** Override the recorder factory (tests inject a mock). */
-  recorderFactory?: () => Recorder
+  /** Override the recorder factory (tests inject a mock). Receives the same
+   *  options the bar would pass to `createRecorder` (incl. `onError`). */
+  recorderFactory?: (opts?: CreateRecorderOptions) => Recorder
   /** Override fetch (tests). */
   fetchImpl?: typeof fetch
   /** CSRF token header value — defaults to TheoKit's "X-Theo-Action: 1". */
@@ -129,7 +130,9 @@ export function VoiceRecorderBar({
 
     let recorder = recorderRef.current
     if (recorder === null) {
-      recorder = (recorderFactory ?? createRecorder)()
+      // #F-wire-1: pass onError so a MediaRecorder error mid-recording (no stop
+      // pending) surfaces via the bar instead of being silently lost.
+      recorder = (recorderFactory ?? createRecorder)({ onError: surface })
       recorderRef.current = recorder
     }
 
@@ -164,10 +167,20 @@ export function VoiceRecorderBar({
           `STT endpoint returned ${res.status}: ${text.slice(0, 200)}`,
         )
       }
-      const data = (await res.json()) as {
-        transcript?: string
-        language?: string
-        durationMs?: number
+      // #217: a 200 response with a malformed body would otherwise throw an
+      // opaque SyntaxError. Guard res.json() and surface a specific error.
+      let data: { transcript?: string; language?: string; durationMs?: number }
+      try {
+        data = (await res.json()) as {
+          transcript?: string
+          language?: string
+          durationMs?: number
+        }
+      } catch (parseErr) {
+        throw new VoicePluginError(
+          'Invalid STT response: the server returned a body that is not valid JSON.',
+          { cause: parseErr },
+        )
       }
       const transcript = data.transcript ?? ''
       const meta: { language?: string; durationMs: number } = {

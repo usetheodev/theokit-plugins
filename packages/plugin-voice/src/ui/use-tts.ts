@@ -124,6 +124,10 @@ export function useTts(options: UseTtsOptions = {}): UseTtsState {
       stop()
       const controller = new AbortController()
       abortRef.current = controller
+      // #216: a newer speak()/stop() reassigns abortRef. After every await we
+      // check identity — not just signal.aborted — so a stale call that resolves
+      // late never overrides the newer call's state or shared refs.
+      const isStale = (): boolean => abortRef.current !== controller
       setError(null)
       setPhase('requesting')
 
@@ -144,7 +148,8 @@ export function useTts(options: UseTtsOptions = {}): UseTtsState {
           signal: controller.signal,
         })
       } catch (err) {
-        if (controller.signal.aborted) return
+        // #216: own-signal abort OR superseded-by-newer-call → bail silently.
+        if (controller.signal.aborted || isStale()) return
         const wrapped =
           err instanceof Error
             ? new VoicePluginError(`TTS network failure: ${err.message}`, { cause: err })
@@ -154,6 +159,9 @@ export function useTts(options: UseTtsOptions = {}): UseTtsState {
         onErrorRef.current?.(wrapped)
         return
       }
+
+      // #216: a newer call superseded us while the fetch was in flight.
+      if (isStale()) return
 
       if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -181,7 +189,7 @@ export function useTts(options: UseTtsOptions = {}): UseTtsState {
         onErrorRef.current?.(wrapped)
         return
       }
-      if (controller.signal.aborted) return
+      if (isStale()) return
 
       const url = URL.createObjectURL(blob)
       blobUrlRef.current = url
@@ -206,6 +214,16 @@ export function useTts(options: UseTtsOptions = {}): UseTtsState {
 
       try {
         await audio.play()
+        // #216: if a newer speak()/stop() took over while play() was resolving,
+        // do NOT flip phase or touch the shared refs (they belong to the newer
+        // call). Tear down only THIS call's own audio + url + listeners.
+        if (isStale()) {
+          audio.removeEventListener('ended', handleEnded)
+          audio.removeEventListener('error', handleError)
+          audio.pause()
+          URL.revokeObjectURL(url)
+          return
+        }
         setPhase('playing')
       } catch (err) {
         // Browsers reject `play()` when there is no user gesture; surface

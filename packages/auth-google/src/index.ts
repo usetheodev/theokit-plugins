@@ -41,12 +41,91 @@ interface TokenResponse {
   scope?: string;
 }
 
-function resolveOidcBaseUrl(opts: GoogleProviderOptions): string {
-  // EC-3: test-only env override (mirrors THEOKIT_TEST_RESPONSE_OVERRIDE gate)
-  if (process.env.NODE_ENV === "test" && process.env.MOCK_GOOGLE_OIDC_BASE_URL) {
-    return process.env.MOCK_GOOGLE_OIDC_BASE_URL;
+// #192: loopback hosts are exempt from the https requirement below. A loopback
+// target can only reach the same machine, so it cannot exfiltrate credentials
+// to an external attacker — which is what lets the test sidecar mock keep using
+// http://localhost while every production OIDC URL stays https-only.
+function isLoopbackHost(hostname: string): boolean {
+  // `URL.hostname` KEEPS the brackets for IPv6 (`new URL("http://[::1]").hostname`
+  // === "[::1]"), so match the bracketed form; the bare "::1" is accepted too for
+  // defensiveness. URL parsing already lowercases the host and normalizes
+  // decimal/octal/hex IPv4 (e.g. 2130706433, 0x7f.0.0.1) to dotted-quad, so the
+  // 127.0.0.0/8 regex catches every loopback IPv4 spelling.
+  // #F-sec-3: "0.0.0.0" (INADDR_ANY) is a wildcard BIND address, not a loopback
+  // DESTINATION — a discovery doc pointing http://0.0.0.0:PORT is a plaintext
+  // exfil vector, not a local mock. It is NOT exempt. (URL parsing normalizes
+  // the short form http://0/ to hostname "0.0.0.0", so that spelling is rejected
+  // by the same omission; IPv6 unspecified "[::]" was never in this set.)
+  if (
+    hostname === "localhost" ||
+    hostname === "[::1]" ||
+    hostname === "::1"
+  ) {
+    return true;
   }
-  return opts.oidcBaseUrl ?? DEFAULT_GOOGLE_OIDC_BASE;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+}
+
+// #192 SSRF guard: any URL we will fetch (the discovery base OR a discovered
+// authorization/token/userinfo endpoint) MUST be https — loopback exempt. The
+// token endpoint receives client_secret + auth code, so an attacker-controlled
+// http endpoint would leak them in plaintext. NOTE: the finding's prescribed
+// "discovered endpoint host == base host" check is deliberately NOT used —
+// real Google discovery spans accounts.google.com / oauth2.googleapis.com /
+// openidconnect.googleapis.com, so strict host-equality would break production.
+// The https-except-loopback rule closes the plaintext-exfil vector without that
+// breakage (supersedes finding #192 sub-fix (c); see CHANGELOG / changeset).
+function assertSafeOidcUrl(rawUrl: string, context: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new GoogleAuthError(
+      "insecure_oidc_url",
+      `${context} "${rawUrl}" is not a valid absolute URL`,
+    );
+  }
+  if (parsed.protocol === "https:") return;
+  if (parsed.protocol === "http:" && isLoopbackHost(parsed.hostname)) return;
+  throw new GoogleAuthError(
+    "insecure_oidc_url",
+    `${context} must use https (got "${parsed.protocol}//${parsed.hostname}"); ` +
+      "only loopback hosts may use http.",
+  );
+}
+
+function resolveOidcBaseUrl(opts: GoogleProviderOptions): string {
+  // EC-3 + #192: the test-only env override is the SSRF entry point most at
+  // risk — an attacker who flips NODE_ENV=test could otherwise redirect
+  // discovery to their server. Honor it ONLY when it targets loopback: a
+  // loopback override cannot exfiltrate to an external host even if NODE_ENV
+  // leaks into prod. This replaces the impractical "build-time flag" (a
+  // published JS lib has no portable build flag) with a restriction that
+  // directly kills the vector (#192 sub-fix (a)).
+  if (process.env.NODE_ENV === "test" && process.env.MOCK_GOOGLE_OIDC_BASE_URL) {
+    const envBase = process.env.MOCK_GOOGLE_OIDC_BASE_URL;
+    let parsed: URL;
+    try {
+      parsed = new URL(envBase);
+    } catch {
+      throw new GoogleAuthError(
+        "ssrf_env_override_non_loopback",
+        `MOCK_GOOGLE_OIDC_BASE_URL "${envBase}" is not a valid URL`,
+      );
+    }
+    if (!isLoopbackHost(parsed.hostname)) {
+      throw new GoogleAuthError(
+        "ssrf_env_override_non_loopback",
+        `MOCK_GOOGLE_OIDC_BASE_URL must target a loopback host (got "${parsed.hostname}"); ` +
+          "the test override cannot point at an external host (SSRF guard, #192).",
+      );
+    }
+    return envBase;
+  }
+  const base = opts.oidcBaseUrl ?? DEFAULT_GOOGLE_OIDC_BASE;
+  // #192 sub-fix (b): a consumer-supplied base must still be https (or loopback).
+  assertSafeOidcUrl(base, "oidcBaseUrl");
+  return base;
 }
 
 function parseCallbackUrl(req: IncomingMessage): URL {
@@ -67,6 +146,10 @@ export function google(opts: GoogleProviderOptions): AuthProvider<GoogleProfile,
       }
       const baseUrl = resolveOidcBaseUrl(opts);
       const metadata = await discoverOidcProvider(baseUrl);
+      // #192: a poisoned discovery doc could point the redirect target at an
+      // attacker (open-redirect / phishing of state + client_id). Reject a
+      // non-https authorization_endpoint before building the redirect URL.
+      assertSafeOidcUrl(metadata.authorization_endpoint, "discovered authorization_endpoint");
       const codeChallenge = await pkceChallengeFromVerifier(tx.pkceVerifier);
 
       const url = new URL(metadata.authorization_endpoint);
@@ -106,6 +189,10 @@ export function google(opts: GoogleProviderOptions): AuthProvider<GoogleProfile,
 
       const baseUrl = resolveOidcBaseUrl(opts);
       const metadata = await discoverOidcProvider(baseUrl);
+      // #192: validate the token endpoint BEFORE the client_secret-bearing POST
+      // fires — a poisoned http token_endpoint would exfiltrate the secret +
+      // auth code in plaintext.
+      assertSafeOidcUrl(metadata.token_endpoint, "discovered token_endpoint");
 
       // Token exchange
       const tokenBody = new URLSearchParams({
@@ -142,6 +229,9 @@ export function google(opts: GoogleProviderOptions): AuthProvider<GoogleProfile,
           "OIDC discovery metadata lacks userinfo_endpoint — cannot fetch profile",
         );
       }
+      // #192: validate the userinfo endpoint before sending the access token to
+      // it — a poisoned http userinfo_endpoint would leak the bearer token.
+      assertSafeOidcUrl(metadata.userinfo_endpoint, "discovered userinfo_endpoint");
       const userRes = await fetch(metadata.userinfo_endpoint, {
         headers: { authorization: `Bearer ${tokens.access_token}` },
       });

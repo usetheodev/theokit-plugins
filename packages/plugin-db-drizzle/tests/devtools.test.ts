@@ -71,6 +71,49 @@ describe("buildDevtoolsTab (P#5 T2.2)", () => {
     expect(iframes[0]?.title).toBe("Drizzle Studio");
   });
 
+  it("test_iframe_sandbox_is_safe (#206)", () => {
+    const iframes: { getAttribute: (k: string) => string | null }[] = [];
+    const container = {
+      ownerDocument: {
+        createElement: (tag: string) => {
+          if (tag !== "iframe") throw new Error(`unexpected element ${tag}`);
+          const attrs: Record<string, string> = {};
+          const stub = {
+            style: {} as Record<string, string>,
+            setAttribute(k: string, v: string) {
+              attrs[k] = v;
+            },
+            getAttribute(k: string) {
+              return attrs[k] ?? null;
+            },
+          };
+          iframes.push(stub);
+          return stub as unknown as HTMLElement;
+        },
+      },
+      replaceChildren: () => undefined,
+    } as unknown as HTMLElement;
+
+    buildDevtoolsTab(resolveOptions({ driver: "sqlite", url: ":memory:" })).mount(container);
+    const sandbox = iframes[0]?.getAttribute("sandbox") ?? "";
+    // #206: combining allow-scripts + allow-same-origin lets framed content
+    // remove its own sandbox → escape. The pair must NOT both be present.
+    const escapePair =
+      sandbox.includes("allow-scripts") && sandbox.includes("allow-same-origin");
+    expect(escapePair).toBe(false);
+  });
+
+  it("test_studio_url_from_resolved_options (#207)", () => {
+    const opts = resolveOptions({
+      driver: "sqlite",
+      url: ":memory:",
+      studioHost: "127.0.0.1",
+      studioPort: 5555,
+    });
+    const tab = buildDevtoolsTab(opts);
+    expect(tab.studioUrl).toBe("http://127.0.0.1:5555");
+  });
+
   it("returns a fresh descriptor on each call (independent mount closures)", () => {
     // Given: two calls
     const opts = resolveOptions({ driver: "sqlite", url: ":memory:" });

@@ -150,4 +150,28 @@ describe('plugin-voice public surface', () => {
       expect(handleTtsRequest.length).toBeGreaterThanOrEqual(2)
     })
   })
+
+  describe('#215 — TTS voice enum (single source of truth)', () => {
+    it('test_invalid_default_voice_rejected_at_construction', () => {
+      // The schema must reject an out-of-enum default voice at construction —
+      // not let it slip through to a 400 at the first request. The enum also
+      // makes this a compile-time error now (the @ts-expect-error proves it),
+      // while this assertion proves the runtime rejection.
+      expect(() =>
+        resolveVoiceConfig({
+          stt: { apiKey: 'sk-x' },
+          // @ts-expect-error invalid voice is now rejected by the enum type too
+          tts: { apiKey: 'sk-x', voice: 'robovoice' },
+        }),
+      ).toThrow()
+    })
+
+    it('accepts a valid tts voice', () => {
+      const cfg = resolveVoiceConfig({
+        stt: { apiKey: 'sk-x' },
+        tts: { apiKey: 'sk-x', voice: 'nova' },
+      })
+      expect(cfg.tts.voice).toBe('nova')
+    })
+  })
 })

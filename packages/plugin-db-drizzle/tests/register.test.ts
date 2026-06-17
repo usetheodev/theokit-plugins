@@ -94,4 +94,25 @@ describe("drizzleDb register(app) lifecycle (P#5 T1.3)", () => {
     // Then: register() does not throw
     expect(() => plugin.register(app)).not.toThrow();
   });
+
+  it("test_cli_conflict_guard_is_effective (#171)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // Fresh app: registering 'db' is silent (no conflict).
+      const fresh = makeApp();
+      drizzleDb({ driver: "sqlite", url: ":memory:" }).register(fresh);
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      // App where 'db' is already registered (e.g. by @theokit/orm): the
+      // conflict branch must behave DIFFERENTLY — warn that it is extending an
+      // existing namespace instead of silently identical handling (the #171 no-op).
+      const conflicted = makeApp();
+      conflicted.cliCommands.set("db", ["orm-existing-command"]);
+      drizzleDb({ driver: "sqlite", url: ":memory:" }).register(conflicted);
+      expect(warnSpy).toHaveBeenCalled();
+      expect(String(warnSpy.mock.calls[0]?.[0])).toMatch(/db|namespace|already/i);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });

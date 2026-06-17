@@ -65,6 +65,13 @@ export interface CreateRecorderOptions {
    * `{ echoCancellation: true, noiseSuppression: true, autoGainControl: true }`.
    */
   audioConstraints?: MediaTrackConstraints
+  /**
+   * Called when the MediaRecorder fires an `error` while recording with no
+   * `stop()` in flight (#213). Without this, such an error would be dropped and
+   * the media stream leaked. Errors during `stop()` still reject the `stop()`
+   * promise as before.
+   */
+  onError?: (err: VoicePluginError) => void
 }
 
 const DEFAULT_MIME = 'audio/webm;codecs=opus'
@@ -81,6 +88,7 @@ export function createRecorder(opts: CreateRecorderOptions = {}): Recorder {
   const mimeType = opts.mimeType ?? DEFAULT_MIME
   const audioBitsPerSecond = opts.audioBitsPerSecond ?? DEFAULT_BITRATE
   const audioConstraints = opts.audioConstraints ?? DEFAULT_CONSTRAINTS
+  const onError = opts.onError
 
   let state: RecorderState = 'idle'
   let stream: MediaStream | null = null
@@ -137,7 +145,17 @@ export function createRecorder(opts: CreateRecorderOptions = {}): Recorder {
         const ex = (event as unknown as { error?: unknown }).error
         const mapped = mapMediaError(ex)
         state = 'idle'
-        if (stopReject) stopReject(mapped)
+        // #213: ALWAYS release the stream on error — not only when a stop() is
+        // pending — so an in-recording failure cannot leak the media tracks.
+        releaseStream()
+        if (stopReject) {
+          // An error during stop() rejects the pending stop() promise.
+          stopReject(mapped)
+        } else {
+          // An error during recording (no stop pending) was previously dropped;
+          // surface it via onError so the consumer can react (#213).
+          onError?.(mapped)
+        }
       })
       mr.addEventListener('stop', () => {
         const finalBlob = new Blob(chunks, { type: mimeType })

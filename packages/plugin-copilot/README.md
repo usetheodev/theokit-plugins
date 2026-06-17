@@ -120,7 +120,7 @@ await runtime.activate("support-bot");
 ```tsx
 // app/page.tsx
 import { CopilotProvider, CopilotChat, useCopilot, useCopilotPresence } from "@theokit/plugin-copilot/react";
-import { provider, runtime } from "./bootstrap";
+import { provider } from "./bootstrap";
 
 export default function Page() {
   return (
@@ -128,8 +128,7 @@ export default function Page() {
       roomId="support-room"
       copilotId="support-bot"
       provider={provider}
-      localConnectionId="alice"
-      runtime={runtime}
+      userConnectionId="alice"
     >
       <CopilotChat />
     </CopilotProvider>
@@ -152,8 +151,14 @@ function MyCustomChat() {
   const messages = useCopilotMessages();
   const presence = useCopilotPresence();      // human peers (filtered)
   const typing = useCopilotTyping();          // {copilotId, progress?} | null
-  useCopilotReadable("currentPage", { url: "/dashboard" });   // broadcasts context to copilot
-  useCopilotTool({ name: "create-task", schema: { /* JSON schema */ } }); // exposes a tool to copilot
+  useCopilotReadable({ description: "currentPage", value: { url: "/dashboard" } }); // broadcasts context to copilot
+  useCopilotTool({
+    name: "create-task",
+    description: "Create a task",
+    handler: async (args) => {
+      /* … */
+    },
+  }); // exposes a tool to copilot
   // …render however you want
 }
 ```

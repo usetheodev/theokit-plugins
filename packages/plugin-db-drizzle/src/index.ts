@@ -58,15 +58,17 @@ export function drizzleDb(opts: DrizzleDbOptions): DrizzleDbPlugin {
       // adding plugin-specific ones (e.g., `seed`).
       if (app.registerCliCommand) {
         const commands = buildDbCommands(resolved);
+        // #171 (EC-4): when the `db` namespace already exists (e.g. @theokit/orm
+        // registered it), we EXTEND it with the drizzle verbs (the runner merges
+        // late entries). Make the conflict path observably different from the
+        // fresh path — warn the operator so a silent namespace collision can't
+        // hide which layer owns which verbs — instead of two identical branches.
         if (app.hasCliCommand?.("db")) {
-          // EC-4: orm already registered. Plugin layer extends it.
-          // Implementation detail: orm's CLI surface accepts late-registered
-          // commands via the same registerCliCommand API; calling with the
-          // existing namespace causes the runner to merge entries.
-          app.registerCliCommand("db", commands);
-        } else {
-          app.registerCliCommand("db", commands);
+          console.warn(
+            "[plugin-db-drizzle] CLI namespace 'db' is already registered — extending it with the drizzle verbs (generate/migrate/push/studio/reset/seed/check).",
+          );
         }
+        app.registerCliCommand("db", commands);
       }
       // Devtools-tab opt-in. Graceful no-op when overlay (G4) absent OR
       // user passed `devtoolsTab: false`.

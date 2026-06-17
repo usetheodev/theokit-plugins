@@ -84,6 +84,58 @@ describe('createArtifactRouteHandlers', () => {
     expect(await res.text()).toMatch(/INVALID_ARTIFACT/)
   })
 
+  // T1.1 (#176) — the REST create path MUST enforce artifact security, like the
+  // agent-tool path. Before the fix these script-bearing artifacts persist (201).
+  it('POST rejects a script-bearing SVG with 400 (security gate)', async () => {
+    const store = createInMemoryArtifactStore()
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.create(
+      jsonRequest(
+        'POST',
+        'http://x/artifacts',
+        md({
+          kind: 'svg',
+          content:
+            '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        }),
+      ),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.text()).toMatch(/svg-script-tag|SECURITY/)
+    expect(await store.get('a1')).toBeNull()
+  })
+
+  it('POST rejects an HTML srcdoc with a meta-refresh with 400 (security gate)', async () => {
+    const store = createInMemoryArtifactStore()
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.create(
+      jsonRequest('POST', 'http://x/artifacts', {
+        id: 'h1',
+        title: 'T',
+        version: 1,
+        createdAt: '2026-05-29T00:00:00Z',
+        kind: 'html',
+        srcdoc:
+          '<!doctype html><meta http-equiv="refresh" content="0;url=https://evil.example">',
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.text()).toMatch(/html-meta-refresh|SECURITY/)
+  })
+
+  it('POST still accepts a benign code artifact with 201 (no over-blocking)', async () => {
+    const store = createInMemoryArtifactStore()
+    const handlers = createArtifactRouteHandlers({ store })
+    const res = await handlers.create(
+      jsonRequest(
+        'POST',
+        'http://x/artifacts',
+        md({ kind: 'code', content: 'const x = 1', language: 'ts' } as Partial<Artifact>),
+      ),
+    )
+    expect(res.status).toBe(201)
+  })
+
   it('POST fires onAfterInsert with the stored artifact', async () => {
     const store = createInMemoryArtifactStore()
     const onAfterInsert = vi.fn()

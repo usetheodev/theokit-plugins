@@ -95,15 +95,39 @@ function loadYjs(): Promise<{ yjs: YjsModule; awareness: YAwarenessModule }> {
   return pendingYjs;
 }
 
+/** Resolved Yjs handles for a room. Returned by `ensureYjs` so callers don't
+ *  re-invoke `loadYjs()` (#196). */
+interface YjsBundle {
+  readonly doc: YDocLike;
+  readonly awareness: AwarenessLike;
+  readonly yjs: YjsModule;
+  readonly awMod: YAwarenessModule;
+}
+
 interface YjsRoomState {
   /** Per-connection presence (LWW; identical to MemoryProvider semantics). */
   readonly presences: Map<string, Presence>;
   /** Active room listeners. */
   readonly listeners: Set<(frame: RealtimeFrame) => void>;
-  /** Lazily-initialized Y.Doc (created on first applyYjsUpdate / awareness call). */
-  doc: YDocLike | null;
-  /** Lazily-initialized Awareness (same trigger). */
-  awareness: AwarenessLike | null;
+  /**
+   * In-flight (or resolved) Y.Doc/Awareness init — the SINGLE source of truth
+   * for the room's doc (#193). Memoized so concurrent `applyYjs*` calls share
+   * exactly one Y.Doc instead of racing on a check-then-act. There is no
+   * separate `doc`/`awareness` fast-path field on purpose: two sources of truth
+   * for "the room's doc" would reintroduce the race.
+   */
+  docInit?: Promise<YjsBundle>;
+  /** Synchronous handle to the resolved bundle, set INSIDE the docInit factory,
+   *  so `gcIfEmpty` can destroy() without awaiting. */
+  resolved?: YjsBundle;
+  /**
+   * Count of in-flight `applyYjs*` ops holding this room (#194). Incremented
+   * synchronously before the `await ensureYjs`, decremented in `finally`.
+   * `gcIfEmpty` defers destroy+delete while this is > 0, so a doc can never be
+   * destroyed (nor the room evicted) mid-operation — closing the apply-after-GC
+   * race AND the GC-during-init orphan in one mechanism.
+   */
+  inflight: number;
 }
 
 /**
@@ -139,20 +163,46 @@ export function createYjsRealtimeProvider(
   const ensureRoom = (roomId: string): YjsRoomState => {
     let state = rooms.get(roomId);
     if (state === undefined) {
-      state = { presences: new Map(), listeners: new Set(), doc: null, awareness: null };
+      state = { presences: new Map(), listeners: new Set(), inflight: 0 };
       rooms.set(roomId, state);
     }
     return state;
   };
 
-  const ensureYjs = async (state: YjsRoomState): Promise<{ doc: YDocLike; awareness: AwarenessLike }> => {
-    if (state.doc !== null && state.awareness !== null) {
-      return { doc: state.doc, awareness: state.awareness };
-    }
-    const { yjs, awareness: aw } = await loadYjs();
-    state.doc = new yjs.Doc({ gc: true });
-    state.awareness = new aw.Awareness(state.doc);
-    return { doc: state.doc, awareness: state.awareness };
+  // #194 invariant: every caller of ensureYjs MUST hold an in-flight refcount
+  // (state.inflight) across the call, so gcIfEmpty cannot evict the room while
+  // init is in flight. The post-await membership re-check below enforces this
+  // structurally — if a future caller forgets the refcount and the room is
+  // evicted mid-init, the just-created doc is destroyed instead of orphaned.
+  const ensureYjs = (roomId: string, state: YjsRoomState): Promise<YjsBundle> => {
+    // #193: single-flight memo. `??=` is synchronous, so two concurrent callers
+    // both assign the SAME factory before either yields at `await` — closing the
+    // check-then-act race that previously orphaned a duplicate Y.Doc. The memo
+    // also carries the loaded modules so callers stop re-invoking loadYjs (#196).
+    state.docInit ??= (async (): Promise<YjsBundle> => {
+      const { yjs, awareness: awMod } = await loadYjs();
+      const doc = new yjs.Doc({ gc: true });
+      const awareness = new awMod.Awareness(doc);
+      const bundle: YjsBundle = { doc, awareness, yjs, awMod };
+      // #194 belt: if the room was evicted while we initialized (only possible
+      // when a caller did not hold an inflight refcount), destroy the doc now so
+      // it is not orphaned, and do NOT publish `resolved` on the dead room. The
+      // caller's post-await membership guard will skip the apply.
+      if (rooms.get(roomId) !== state) {
+        awareness.destroy();
+        doc.destroy();
+      } else {
+        // Synchronous handle for gcIfEmpty.destroy() (set after the awaits).
+        state.resolved = bundle;
+      }
+      return bundle;
+    })().catch((e) => {
+      // EC-1: a failed init clears the memo so a later apply can recreate the
+      // doc — no permanently bricked room.
+      state.docInit = undefined;
+      throw e;
+    });
+    return state.docInit;
   };
 
   const fanout = (state: YjsRoomState, frame: RealtimeFrame): void => {
@@ -170,8 +220,19 @@ export function createYjsRealtimeProvider(
 
   const gcIfEmpty = (roomId: string, state: YjsRoomState): void => {
     if (state.presences.size === 0 && state.listeners.size === 0) {
-      if (state.awareness !== null) state.awareness.destroy();
-      if (state.doc !== null) state.doc.destroy();
+      // #194: defer destroy AND room-map eviction while an apply is in flight.
+      // Coupling these two deferrals is load-bearing: it prevents both a
+      // destroy-during-apply AND a room-identity swap (a new joinRoom would get
+      // the SAME state object since it is not evicted). The in-flight op's
+      // finally re-invokes gcIfEmpty once inflight hits 0.
+      if (state.inflight > 0) return;
+      // Only a resolved bundle has a doc to destroy. A doc whose init is still
+      // in flight (resolved === undefined) cannot be reached here because the
+      // initiating apply holds inflight > 0 above.
+      if (state.resolved !== undefined) {
+        state.resolved.awareness.destroy();
+        state.resolved.doc.destroy();
+      }
       rooms.delete(roomId);
     }
   };
@@ -244,6 +305,8 @@ export function createYjsRealtimeProvider(
     },
 
     async applyYjsUpdate(roomId, connectionId, bytes): Promise<void> {
+      // #194: the oversized check MUST precede the inflight++ — it throws with
+      // no surrounding finally, so incrementing first would leak a refcount.
       if (bytes.byteLength > maxUpdateBytes) {
         throw new RealtimeError(
           `Y.Doc update size ${bytes.byteLength}B exceeds maxUpdateBytes ${maxUpdateBytes}B`,
@@ -252,12 +315,25 @@ export function createYjsRealtimeProvider(
       }
       const state = rooms.get(roomId);
       if (state === undefined) return;
-      const { doc } = await ensureYjs(state);
-      const { yjs } = await loadYjs();
-      yjs.applyUpdate(doc, bytes, connectionId);
+      // #194: claim the room BEFORE the await (atomic — no await between rooms.get
+      // and this line) so gcIfEmpty defers while we operate; release in finally.
+      state.inflight += 1;
+      try {
+        // #196: ensureYjs returns the loaded module in the bundle — no redundant loadYjs.
+        const { doc, yjs } = await ensureYjs(roomId, state);
+        // #194 belt: if the room was evicted mid-op (only possible without the
+        // refcount we hold — i.e. defensive), skip the apply (safe no-op) rather
+        // than touch a destroyed doc.
+        if (rooms.get(roomId) !== state) return;
+        yjs.applyUpdate(doc, bytes, connectionId);
+      } finally {
+        state.inflight -= 1;
+        gcIfEmpty(roomId, state);
+      }
     },
 
     async applyYjsAwareness(roomId, connectionId, bytes): Promise<void> {
+      // #194: oversized check precedes inflight++ (throws without a finally).
       if (bytes.byteLength > maxUpdateBytes) {
         throw new RealtimeError(
           `Y.Awareness update size ${bytes.byteLength}B exceeds maxUpdateBytes ${maxUpdateBytes}B`,
@@ -266,9 +342,16 @@ export function createYjsRealtimeProvider(
       }
       const state = rooms.get(roomId);
       if (state === undefined) return;
-      const { awareness } = await ensureYjs(state);
-      const { awareness: awMod } = await loadYjs();
-      awMod.applyAwarenessUpdate(awareness, bytes, connectionId);
+      state.inflight += 1;
+      try {
+        // #196: ensureYjs returns the loaded module in the bundle — no redundant loadYjs.
+        const { awareness, awMod } = await ensureYjs(roomId, state);
+        if (rooms.get(roomId) !== state) return;
+        awMod.applyAwarenessUpdate(awareness, bytes, connectionId);
+      } finally {
+        state.inflight -= 1;
+        gcIfEmpty(roomId, state);
+      }
     },
   };
 }

@@ -10,6 +10,8 @@
  *     lives in the Repository contract, NOT here.
  */
 
+import { createHash } from "node:crypto";
+
 import type { MagicLinkStore, MagicLinkTokenRecord } from "./types.js";
 
 interface MemoryEntry {
@@ -17,33 +19,46 @@ interface MemoryEntry {
   expiresAt: Date;
 }
 
+/**
+ * Hash a magic-link token for storage/lookup (#191). Tokens are 32-byte
+ * high-entropy `crypto.randomBytes` values, so an UNSALTED SHA-256 is correct
+ * here (EC-12): there is no rainbow-table/brute-force surface as with low-entropy
+ * passwords, so a salt/KDF (bcrypt/argon2) is unnecessary. A store/DB/log leak
+ * then exposes only hashes, not live credentials. The raw token never rests.
+ */
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 export function createMemoryStore(): MagicLinkStore {
+  // Keyed by sha256(token) — the raw token is never stored (#191).
   const tokens = new Map<string, MemoryEntry>();
 
   return {
     async createToken({ email, token, expiresAt }) {
-      tokens.set(token, { email, expiresAt });
+      tokens.set(hashToken(token), { email, expiresAt });
     },
     async consumeToken({ token }) {
       // EC-11 atomicity: read + delete in a single sync turn — JS event loop
       // guarantees no interleave between two concurrent consumeToken calls
-      // on the in-memory adapter.
-      const entry = tokens.get(token);
+      // on the in-memory adapter. Lookup is by hash (#191).
+      const key = hashToken(token);
+      const entry = tokens.get(key);
       if (!entry) return null;
-      tokens.delete(token);
+      tokens.delete(key);
       if (entry.expiresAt.getTime() <= Date.now()) return null;
       const record: MagicLinkTokenRecord = { email: entry.email, expiresAt: entry.expiresAt };
       return record;
     },
     async revokeToken({ token }) {
-      tokens.delete(token);
+      tokens.delete(hashToken(token));
     },
     async cleanupExpired() {
       const now = Date.now();
       let removed = 0;
-      for (const [token, entry] of tokens) {
+      for (const [key, entry] of tokens) {
         if (entry.expiresAt.getTime() <= now) {
-          tokens.delete(token);
+          tokens.delete(key);
           removed += 1;
         }
       }
@@ -71,18 +86,22 @@ export interface MagicLinkRepository {
 }
 
 export function createOrmStore(repo: MagicLinkRepository): MagicLinkStore {
+  // Tokens are hashed before they reach the repository (#191) — the persisted
+  // `token` column holds sha256(token), never the raw credential. Lookups hash
+  // the incoming raw token, so the atomic UPDATE...RETURNING semantics are
+  // unchanged (only the matched key differs).
   return {
     async createToken({ email, token, expiresAt }) {
-      await repo.insert({ token, email, expiresAt, consumedAt: null });
+      await repo.insert({ token: hashToken(token), email, expiresAt, consumedAt: null });
     },
     async consumeToken({ token }) {
-      const row = await repo.consumeAtomically(token, new Date());
+      const row = await repo.consumeAtomically(hashToken(token), new Date());
       if (!row) return null;
       if (row.expiresAt.getTime() <= Date.now()) return null;
       return { email: row.email, expiresAt: row.expiresAt };
     },
     async revokeToken({ token }) {
-      await repo.delete(token);
+      await repo.delete(hashToken(token));
     },
     async cleanupExpired() {
       return repo.deleteExpired(new Date());

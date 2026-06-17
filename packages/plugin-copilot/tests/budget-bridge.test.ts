@@ -121,4 +121,49 @@ describe("BudgetBridge — calendar month boundaries", () => {
     vi.spyOn(Date, "now").mockReturnValue(feb1);
     expect(b.getUsage("c1", "r1").monthlyUsedUsd).toBe(0);
   });
+
+  describe("reservation model (#219 / #223 / EC-2)", () => {
+    it("test_reserve_holds_budget_so_second_concurrent_reserve_is_rejected", () => {
+      const b = new BudgetBridge({ perRoom: { dailyUsd: 0.5 } });
+      const r1 = b.reserve("c1", "r1", 0.5); // atomic check + hold
+      expect(r1).toBeDefined();
+      // The hold is visible immediately — a concurrent second invocation that
+      // ran preflight before the first charged would now be rejected (no TOCTOU).
+      expect(b.getUsage("c1", "r1").dailyUsedUsd).toBeCloseTo(0.5, 4);
+      expect(() => b.reserve("c1", "r1", 0.5)).toThrow(/dailyUsd 0.5 exceeded/);
+    });
+
+    it("test_reserve_rechecks_per_request_limit", () => {
+      const b = new BudgetBridge({ perRoom: { perRequestUsd: 0.001 } });
+      expect(() => b.reserve("c1", "r1", 0.01)).toThrow(CopilotError);
+      expect(() => b.reserve("c1", "r1", 0.01)).toThrow(/perRequestUsd/);
+    });
+
+    it("test_release_restores_held_budget", () => {
+      const b = new BudgetBridge({ perRoom: { dailyUsd: 0.5 } });
+      const r = b.reserve("c1", "r1", 0.5);
+      b.release(r);
+      expect(b.getUsage("c1", "r1").dailyUsedUsd).toBe(0);
+      // Budget is freed → a later invocation is admitted.
+      expect(() => b.reserve("c1", "r1", 0.5)).not.toThrow();
+    });
+
+    it("test_reconcile_settles_to_actual_and_is_idempotent", () => {
+      const b = new BudgetBridge({ perRoom: { dailyUsd: 1 } });
+      const r = b.reserve("c1", "r1", 0.5); // holds 0.5
+      b.reconcile(r, 0.2); // actual was 0.2
+      expect(b.getUsage("c1", "r1").dailyUsedUsd).toBeCloseTo(0.2, 4);
+      // Double-settle is a no-op (settled flag).
+      b.reconcile(r, 0.9);
+      b.release(r);
+      expect(b.getUsage("c1", "r1").dailyUsedUsd).toBeCloseTo(0.2, 4);
+    });
+
+    it("test_reconcile_clamps_nonnegative", () => {
+      const b = new BudgetBridge({ perRoom: { dailyUsd: 1 } });
+      const r = b.reserve("c1", "r1", 0.5);
+      b.reconcile(r, 0); // actual 0 → delta -0.5 must not drive usage negative
+      expect(b.getUsage("c1", "r1").dailyUsedUsd).toBe(0);
+    });
+  });
 });

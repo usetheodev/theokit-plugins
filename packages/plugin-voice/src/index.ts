@@ -3,9 +3,11 @@
  *
  * Architecture (0.5.0 — corrected after T3.5 dogfood):
  *
- *   The handlers are framework-agnostic Fetch primitives:
- *     `handleSttRequest(request: Request, config): Promise<Response>`
- *     `handleTtsRequest(request: Request, config): Promise<Response>`
+ *   The handlers accept an already-parsed input + resolved config and
+ *   return a Fetch `Response` (the caller extracts audio/JSON from the
+ *   inbound request — theokit's `defineRoute` already parses the body):
+ *     `handleSttRequest(input: SttInput, config, opts?): Promise<Response>`
+ *     `handleTtsRequest(input: TtsInput, config, opts?): Promise<Response>`
  *
  *   Consumers wire them via a 12-line `defineRoute` stub per endpoint
  *   in `server/routes/voice/{stt,tts}.ts`. The plugin still ships

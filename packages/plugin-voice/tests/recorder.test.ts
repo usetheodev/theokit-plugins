@@ -279,6 +279,29 @@ describe('T3.2 — createRecorder (EC-4 + EC-12 + EC-15)', () => {
     })
   })
 
+  describe('T5.2 — #213 in-recording error releases stream + surfaces', () => {
+    it('test_recording_error_releases_stream_and_surfaces', async () => {
+      // A MediaRecorder error DURING recording (no stop() pending) must always
+      // release the stream AND surface via onError — not be silently dropped
+      // with a leaked stream.
+      const fakeStream = makeFakeStream()
+      installMediaDevices(async () => fakeStream as unknown as MediaStream)
+      const mr = installMediaRecorder()
+      const onError = vi.fn()
+      const recorder = createRecorder({ onError })
+      await recorder.start()
+      expect(recorder.state()).toBe('recording')
+
+      mr.__lastInstance?.emitError(makeDomException('NotReadableError', 'device lost'))
+
+      expect(onError).toHaveBeenCalledOnce()
+      expect(onError.mock.calls[0]![0]).toBeInstanceOf(VoicePluginError)
+      for (const t of fakeStream.getTracks()) {
+        expect(t.stop).toHaveBeenCalledOnce()
+      }
+    })
+  })
+
   describe('state machine guards', () => {
     it('stop() called before start() rejects without crashing', async () => {
       installMediaDevices(async () => makeFakeStream() as unknown as MediaStream)

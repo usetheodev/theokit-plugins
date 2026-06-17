@@ -106,6 +106,20 @@ describe('sanitizeSvg', () => {
     expect(report.removedOnHandler).toBe(false)
     expect(report.removedJsUrl).toBe(false)
   })
+
+  // T1.4 (#179 regex mutate corrupts valid markup + #180 lossy verdict):
+  // a benign https href that merely contains the literal "javascript:" in its
+  // query string is SAFE (DOMPurify keeps it — the scheme is https). The old
+  // post-sanitize regex deleted the whole href (corruption, #179) AND the
+  // regex-diff verdict then falsely reported removedJsUrl=true (#180).
+  it('keeps a benign https href containing "javascript:" in its query and does not falsely flag removedJsUrl', () => {
+    const { output, report } = sanitizeSvg(
+      '<svg xmlns="http://www.w3.org/2000/svg"><a href="https://example.com/?ref=javascript:guide"><rect/></a></svg>',
+    )
+    expect(output).toContain('example.com') // #179: valid href not nuked
+    expect(output).toMatch(/href=/) // the href attribute survives
+    expect(report.removedJsUrl).toBe(false) // #180: accurate verdict — nothing js-URL was removed
+  })
 })
 
 describe('sanitizeHtmlSrcdoc', () => {
@@ -120,5 +134,42 @@ describe('sanitizeHtmlSrcdoc', () => {
   it('preserves benign HTML content', () => {
     const { output } = sanitizeHtmlSrcdoc('<p>hi</p>')
     expect(output).toContain('<p>hi</p>')
+  })
+
+  // #F-arch-1/F-sec-1: verdict must come from DOMPurify removals, not a regex
+  // that requires quoted http-equiv (unquoted meta-refresh bypassed it).
+  it('test_unquoted_meta_refresh_srcdoc_is_flagged (#F-arch-1)', () => {
+    const { output, report } = sanitizeHtmlSrcdoc(
+      '<meta http-equiv=refresh content=0><p>hi</p>',
+    )
+    expect(report.removedScript).toBe(true) // dangerous removal → enforceArtifactSecurity throws
+    expect(output).not.toMatch(/<meta/i)
+  })
+
+  it('test_iframe_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<iframe src="https://evil.test"></iframe><p>ok</p>')
+    expect(report.removedScript).toBe(true)
+  })
+
+  it('test_on_handler_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<p onclick="evil()">x</p>')
+    expect(report.removedScript).toBe(true)
+  })
+
+  it('clean HTML is not flagged (no false positive)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<p>hello <strong>world</strong></p>')
+    expect(report.removedScript).toBe(false)
+    expect(report.removedIframe).toBe(false)
+  })
+
+  it('test_script_tag_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { output, report } = sanitizeHtmlSrcdoc('<script>alert(1)</script><p>ok</p>')
+    expect(report.removedScript).toBe(true)
+    expect(output).not.toMatch(/<script/i)
+  })
+
+  it('test_javascript_url_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<a href="javascript:evil()">x</a>')
+    expect(report.removedScript).toBe(true)
   })
 })

@@ -1,47 +1,45 @@
 # Architecture Map — theokit-plugins
 
-Generated: 2026-06-11 | Phase 1 (baseline)
+Monorepo (pnpm workspace) of `@theokit/*` plugins — composable building blocks for
+Theo-based apps. Each package is an independent module published under `@theokit/`.
 
-## Overview
-
-```
-theokit-plugins-monorepo (pnpm workspaces)
-|
-+-- packages/
-|   +-- auth-github/          @theokit/auth-github        (OAuth 2.0 provider)
-|   +-- auth-google/          @theokit/auth-google         (OIDC provider)
-|   +-- auth-magic-link/      @theokit/auth-magic-link     (email token provider)
-|   +-- plugin-canvas/        @theokit/plugin-canvas        (artifact protocol + UI)
-|   +-- plugin-copilot/       @theokit/plugin-copilot       (AI copilot runtime)
-|   +-- plugin-db-drizzle/    @theokit/plugin-db-drizzle    (Drizzle ORM integration)
-|   +-- plugin-email/         @theokit/plugin-email          (email sending)
-|   +-- plugin-forms/         @theokit/plugin-forms          (form validation + hooks)
-|   +-- plugin-payments/      @theokit/plugin-payments       (Stripe payments)
-|   +-- plugin-realtime/      @theokit/plugin-realtime       (WebSocket/Yjs rooms)
-|   +-- plugin-voice/         @theokit/plugin-voice          (STT + TTS)
-```
-
-## Dependency Direction
-
-All packages depend on `@theokit/sdk` (the core framework) via peer dependencies.
-Inter-plugin dependencies exist via bridge modules:
-
-- plugin-copilot -> plugin-canvas (canvas-bridge.ts)
-- plugin-copilot -> plugin-voice (voice-bridge.ts)
-- plugin-copilot -> plugin-realtime (via room bindings)
-- auth-magic-link -> plugin-email (optional integration for sending magic-link emails)
-
-## Entry Point Architecture
-
-Each plugin follows the TheoKit plugin shape pattern:
-- Factory function (`defineX`, `drizzleDb`, `voicePlugin`) returning a `TheoPlugin` descriptor
-- Provider interface (DIP) for extensibility (EmailProvider, RealtimeProvider, AuthProvider)
-- Server-only barrel (`.`) and optional client-side barrel (`./ui`, `./react`)
-
-## Build Pipeline
+## Product packages (deep-review scope)
 
 ```
-TypeScript source -> tsup (ESM, .d.ts) -> dist/
-Tests: Vitest
-Versioning: Changesets (@changesets/cli)
+auth-github ─┐
+auth-google ─┼─ OAuth/identity providers (token exchange, CSRF state)
+auth-magic-link ┘   └─ token store
+
+plugin-canvas ──── artifact bus + HTML sanitization (DOMPurify)  [XSS surface]
+plugin-copilot ─── AI agent room member + bridges (canvas/voice/budget) + trigger-evaluator
+plugin-realtime ── yjs CRDT provider + rooms + memory provider     [concurrency]
+plugin-voice ───── STT/TTS servers + recorder                      [external I/O, streaming]
+plugin-payments ── Stripe checkout + webhook (sig verify) + idempotency + currency  [money]
+plugin-email ───── Resend provider + react-email render + magic-link email
+plugin-db-drizzle ─ Drizzle integration + CLI migrations
+plugin-forms ───── useTheoField + action-error adapter
 ```
+
+## Repo development harness (sampled — NOT shipped product)
+
+- `.claude/skills/**` — cycle harness (plan/discover/implement/review/code-quality). Python.
+- `.claude/hooks/**` — Git/session hooks (stop-validation, public-copy-lint).
+- `.claude/scripts/**` — xref + e2e smoke checks.
+- `scripts/scope-rename.sh` — repo maintenance.
+
+## Layering (per package, typical)
+
+```
+index.ts (public API / composition root)
+   ↓
+define-*.ts / provider.ts (use-case orchestration)
+   ↓
+internal/** , server/** (runtime, bridges, IO adapters)
+   ↓
+types.ts / schema.ts / errors.ts (contracts)
+```
+
+## Cross-package dependencies (observed)
+
+- plugin-copilot bridges into plugin-canvas, plugin-voice, plugin-realtime (budget/canvas/voice bridges).
+- auth-magic-link ↔ plugin-email (magic-link email rendering).

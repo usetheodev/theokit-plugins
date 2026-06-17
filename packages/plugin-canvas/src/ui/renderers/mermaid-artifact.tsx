@@ -1,6 +1,7 @@
 import { CodeBlock } from '@theokit/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { sanitizeSvg } from './sanitize.js'
 import type { ArtifactRendererProps } from './types.js'
 
 interface MermaidApi {
@@ -60,7 +61,10 @@ export function MermaidArtifact({ artifact }: ArtifactRendererProps<'mermaid'>) 
       }
       try {
         const result = await mermaid.render(`mermaid-${id}`, artifact.content)
-        if (!cancelled) setSvg(result.svg)
+        // T1.3 (#177): defense-in-depth — sanitize the mermaid output before
+        // injecting it. securityLevel:'strict' has documented XSS bypasses, so
+        // we never trust the rendered SVG verbatim.
+        if (!cancelled) setSvg(sanitizeSvg(result.svg).output)
       } catch {
         if (!cancelled) setFailed(true)
       }
@@ -83,7 +87,7 @@ export function MermaidArtifact({ artifact }: ArtifactRendererProps<'mermaid'>) 
       <div
         ref={ref}
         className="grid place-items-center"
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Mermaid sanitises with securityLevel=strict
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG is passed through sanitizeSvg (DOMPurify) before injection (T1.3/#177), on top of mermaid securityLevel=strict
         dangerouslySetInnerHTML={svg !== null ? { __html: svg } : undefined}
       />
     </div>

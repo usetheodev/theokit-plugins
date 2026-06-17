@@ -165,13 +165,9 @@ export function defineArtifactTool(options: DefineArtifactToolOptions): Artifact
         'kind-not-allowed',
       )
     }
-    try {
-      enforceArtifactSecurity(artifact)
-    } catch (err) {
-      // Re-raise so the SDK runtime reports the security failure as a
-      // tool error rather than swallowing it.
-      throw err
-    }
+    // T1.5 (#181): call directly — a security failure propagates to the SDK
+    // runtime as a tool error on its own; the old try/catch only re-threw.
+    enforceArtifactSecurity(artifact)
     if (ctx.sessionId !== undefined && artifact.sessionId === undefined) {
       artifact = { ...artifact, sessionId: ctx.sessionId }
     }
