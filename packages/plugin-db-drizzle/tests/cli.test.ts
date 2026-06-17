@@ -80,6 +80,32 @@ describe("buildDbCommands (P#5 T2.1) — 7 verbs", () => {
     expect(args).toContain("./drizzle/migrations");
   });
 
+  it("test_connection_opts_forwarded_to_drizzle_kit (#169)", () => {
+    const opts = resolveOptions({ driver: "postgres", url: "postgres://h/db" });
+    for (const verb of ["migrate", "push", "studio", "check"] as DbVerb[]) {
+      const args = buildDbCommands(opts).find((c) => c.verb === verb)!.buildArgs(opts);
+      expect(args).toContain("--dialect");
+      expect(args).toContain("postgresql"); // driver → dialect mapped (NOT --driver)
+      expect(args).toContain("--url");
+      expect(args).toContain("postgres://h/db");
+    }
+  });
+
+  it("generate does NOT receive connection flags (#169)", () => {
+    const opts = resolveOptions({ driver: "postgres", url: "postgres://h/db" });
+    const args = buildDbCommands(opts).find((c) => c.verb === "generate")!.buildArgs(opts);
+    expect(args).not.toContain("--url");
+    expect(args).not.toContain("--dialect");
+  });
+
+  it("omits --url when url is undefined (no corrupt arg vector) (#169)", () => {
+    const opts = resolveOptions({ driver: "sqlite" }); // url omitted
+    const args = buildDbCommands(opts).find((c) => c.verb === "migrate")!.buildArgs(opts);
+    expect(args).not.toContain("--url");
+    expect(args).toContain("--dialect");
+    expect(args).toContain("sqlite");
+  });
+
   it("test_reset_requires_force (#168)", () => {
     // The destructive `reset` verb must be FLAGGED as force-requiring so the
     // runner refuses it without --force. (Enforcement is runner-side; here we

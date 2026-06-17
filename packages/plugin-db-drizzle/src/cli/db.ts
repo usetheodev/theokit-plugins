@@ -12,7 +12,7 @@
  * presence with an actionable error message.
  */
 
-import type { ResolvedDrizzleDbOptions } from "../options.js";
+import type { DrizzleDriver, ResolvedDrizzleDbOptions } from "../options.js";
 
 /** Per-verb command descriptor. The runner reads these to dispatch CLI args. */
 export interface DbCommand {
@@ -79,6 +79,16 @@ const SUMMARIES: Record<DbVerb, string> = {
  * Shared drizzle-kit invocation prefix for any verb. Subcommands may push
  * verb-specific flags on top (e.g., `reset --force`).
  */
+/** drizzle-kit's connection flag is `--dialect` (NOT `--driver`); map our driver. */
+const DRIVER_TO_DIALECT: Record<DrizzleDriver, string> = {
+  postgres: "postgresql",
+  mysql: "mysql",
+  sqlite: "sqlite",
+};
+
+/** Verbs that open a DB connection and therefore need `--dialect`/`--url` (#169). */
+const CONNECTION_VERBS: ReadonlySet<DbVerb> = new Set(["migrate", "push", "studio", "check"]);
+
 function baseArgs(verb: DbVerb, opts: ResolvedDrizzleDbOptions): string[] {
   const args: string[] = [verb, "--schema", opts.schemaPath];
   // The `out` flag is used by `generate` to write migration files into the
@@ -86,7 +96,17 @@ function baseArgs(verb: DbVerb, opts: ResolvedDrizzleDbOptions): string[] {
   if (verb === "generate") {
     args.push("--out", opts.migrationsPath);
   }
-  // Studio binds to a port — drizzle-kit defaults to 4983 (D2 ADR — pure
-  // passthrough; no plugin-side port hijacking).
+  // #169: forward the documented connection options to drizzle-kit for the verbs
+  // that need a live connection. `generate` only diffs the schema, so it is
+  // intentionally excluded. Each flag is conditional on its source being set —
+  // pushing `--url undefined` would corrupt the arg vector.
+  if (CONNECTION_VERBS.has(verb)) {
+    if (opts.driver !== undefined) {
+      args.push("--dialect", DRIVER_TO_DIALECT[opts.driver]);
+    }
+    if (opts.url !== undefined) {
+      args.push("--url", opts.url);
+    }
+  }
   return args;
 }
