@@ -551,6 +551,35 @@ describe("CopilotRuntime", () => {
     }
   });
 
+  it("test_non_conforming_completion_rejected (#224)", async () => {
+    const provider = makeMemoryProvider();
+    let capturedSchema: { safeParse: (v: unknown) => { success: boolean } } | undefined;
+    const spyAgent: CopilotAgentLike = {
+      async *streamObject<T>(opts: Record<string, unknown>) {
+        capturedSchema = opts.schema as
+          | { safeParse: (v: unknown) => { success: boolean } }
+          | undefined;
+        yield { type: "complete" as const, object: { text: "ok" } as unknown as T };
+      },
+    };
+    const rt = new CopilotRuntime({ provider, agent: spyAgent, copilots: [baseCopilot] });
+    await rt.activate("c1");
+    provider.emit("room-1", {
+      type: "broadcast",
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "hi" },
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    // #224: a REAL schema must be passed (not a passthrough that accepts
+    // everything) so the agent rejects non-conforming completions.
+    expect(capturedSchema).toBeDefined();
+    expect(capturedSchema!.safeParse({ text: "hi" }).success).toBe(true);
+    expect(capturedSchema!.safeParse({ notText: 1 }).success).toBe(false);
+    expect(capturedSchema!.safeParse("not an object").success).toBe(false);
+  });
+
   it("test_untrusted_text_is_role_isolated (#218)", async () => {
     const provider = makeMemoryProvider();
     let capturedOpts: Record<string, unknown> | undefined;

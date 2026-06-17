@@ -11,6 +11,8 @@
  * @internal
  */
 
+import { z } from "zod";
+
 import { AgentRoomMember } from "../agent-room-member.js";
 import {
   type CopilotAgentLike,
@@ -289,13 +291,11 @@ export class CopilotRuntime {
           ? reg.descriptor.agent.apiKey()
           : reg.descriptor.agent.apiKey;
 
-      // Minimal Zod-like passthrough schema (Agent.streamObject expects a schema).
-      const passthrough = {
-        safeParse: (v: unknown) => ({ success: true, data: v }),
-        parse: (v: unknown) => v,
-      };
+      // #224: a REAL schema (not a passthrough) so non-conforming completions
+      // are rejected by the agent instead of silently coerced.
+      const responseSchema = z.object({ text: z.string() });
       const iter = this.agent.streamObject<{ text: string }>({
-        schema: passthrough,
+        schema: responseSchema,
         prompt: promptText,
         model: reg.descriptor.agent.model,
         ...(resolvedApiKey !== undefined ? { apiKey: resolvedApiKey } : {}),
