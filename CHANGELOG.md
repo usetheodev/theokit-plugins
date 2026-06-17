@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- plugin-voice: `<VoiceRecorderBar>` now passes its `onError` handler to the recorder, so a `MediaRecorder` error that fires mid-recording (no `stop()` pending) surfaces via the bar's `onError` + error state instead of being silently lost while the bar stays in the recording state. The `recorderFactory` test seam now receives the recorder options (review finding F-wire-1)
 - plugin-copilot: the README Quick start now matches the real API — `CopilotProvider` takes `userConnectionId` (not `localConnectionId`) and has no `runtime` prop, and the headless hooks use their object-argument signatures (`useCopilotReadable({ description, value })`, `useCopilotTool({ name, description, handler })`). The documented integration path now compiles and runs as written (guarded by a test that mirrors it) (#172, #173)
 - plugin-copilot: budget usage now reflects the provider's actual reported cost (from the agent's `complete` event `usage.costUsd`) instead of always charging a fixed per-invocation estimate; when the provider reports no cost, it falls back to the configured estimate. Builds on the reservation model (the reservation is reconciled to the actual on completion) (#174)
 - plugin-copilot: the agent completion is now validated against a real `z.object({ text: z.string() })` schema instead of a passthrough that accepted any shape — a non-conforming completion is rejected rather than silently coerced (#224)

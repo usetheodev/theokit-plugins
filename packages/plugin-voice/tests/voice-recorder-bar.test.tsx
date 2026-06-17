@@ -331,4 +331,41 @@ describe('T3.4 — VoiceRecorderBar', () => {
     expect(err).toBeInstanceOf(VoicePluginError)
     expect(String(err.message)).toMatch(/invalid stt response/i)
   })
+
+  it('test_in_recording_error_surfaces_via_onError (#F-wire-1)', async () => {
+    // #F-wire-1: a MediaRecorder error mid-recording (no stop pending) must
+    // surface via the bar's onError + set phase=error. The bar must pass its
+    // onError handler to createRecorder — proven by the injected factory
+    // receiving opts.onError. Pre-fix the bar called createRecorder() with no
+    // args, so capturedOnError stays undefined → this test is RED.
+    let capturedOnError: ((err: VoicePluginError) => void) | undefined
+    const rec = fakeRecorder()
+    const onError = vi.fn()
+    render(
+      <VoiceRecorderBar
+        onTranscript={() => undefined}
+        onError={onError}
+        recorderFactory={(opts?: { onError?: (e: VoicePluginError) => void }) => {
+          capturedOnError = opts?.onError
+          return rec
+        }}
+      />,
+    )
+    const btn = screen.getByTestId('voice-recorder-button')
+    await act(async () => {
+      fireEvent.click(btn)
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(btn.getAttribute('data-phase')).toBe('recording'))
+
+    // The recorder reports an in-recording error through the wired onError.
+    await act(async () => {
+      capturedOnError?.(new VoicePluginError('hardware failure mid-recording'))
+      await Promise.resolve()
+    })
+
+    expect(capturedOnError).toBeTypeOf('function') // bar wired onError into createRecorder
+    expect(onError).toHaveBeenCalledOnce()
+    expect(btn.getAttribute('data-phase')).toBe('error')
+  })
 })
