@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- plugin-copilot: budget accounting is now race-safe. Idle-trigger invocations run through the same per-copilot queue as broadcasts (so they can no longer run concurrently and double-spend), the budget preflight now atomically reserves the estimated cost (check + hold in one step) and reconciles it on completion / releases it on failure (no leaked budget on a failed invocation), and an idle trigger can no longer fire after `deactivate()` (#219, #223, #221)
 - plugin-voice: `<VoiceRecorderBar>` now guards the STT success-response JSON parse — a malformed (non-JSON) 200 body surfaces a specific `VoicePluginError` ("Invalid STT response…") via `onError` instead of throwing an opaque `SyntaxError` (#217)
 - plugin-voice: `useTts` no longer lets a stale `speak()` whose `audio.play()` resolves late override a newer `speak()`/`stop()`. Each call captures its own controller and, after every await, bails when it is no longer the active call — tearing down only its own audio/blob URL/listeners instead of clobbering the newer call's state (#216)
 - plugin-voice: the TTS `voice` option is now validated against a single shared enum (`alloy`/`echo`/`fable`/`onyx`/`nova`/`shimmer`) at construction, so a misconfigured default voice fails fast instead of diverging from the server's runtime check and only surfacing as a 400 on the first request. The server's per-request voice validation now derives from the same source of truth (#215)

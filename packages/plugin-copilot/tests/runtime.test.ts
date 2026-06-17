@@ -427,6 +427,70 @@ describe("CopilotRuntime", () => {
     expect(capturedOpts?.apiKey).toBe(thunkKey);
   });
 
+  it("test_reservation_released_when_runagent_throws (#219 EC-2)", async () => {
+    const provider = makeMemoryProvider();
+    const throwingAgent: CopilotAgentLike = {
+      // eslint-disable-next-line require-yield
+      async *streamObject<T>(): AsyncGenerator<{ type: "complete"; object: T }, void, void> {
+        throw new Error("upstream boom");
+      },
+    };
+    const copilot = defineCopilot({
+      ...baseCopilot,
+      id: "rel-test",
+      budget: { perRoom: { dailyUsd: 1 } },
+    });
+    const rt = new CopilotRuntime({
+      provider,
+      agent: throwingAgent,
+      copilots: [copilot],
+      estimatedCostPerInvocationUsd: 0.5,
+    });
+    await rt.activate("rel-test");
+
+    provider.emit("room-1", {
+      type: "broadcast",
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "hi" },
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    // EC-2: the reservation made at preflight must be released on failure, so a
+    // failed invocation leaves no budget held (otherwise usage would be 0.5).
+    expect(rt.getUsage("rel-test")?.dailyUsedUsd).toBe(0);
+  });
+
+  it("test_idle_runagent_blocked_after_deactivate (#221)", async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = makeMemoryProvider();
+      let agentCalls = 0;
+      const agent: CopilotAgentLike = {
+        async *streamObject<T>() {
+          agentCalls++;
+          yield { type: "complete" as const, object: { text: "x" } as unknown as T };
+        },
+      };
+      const idleCopilot = defineCopilot({
+        ...baseCopilot,
+        id: "idle-d",
+        triggers: [{ on: "presence:idle", action: "suggest", idleMs: 1000 }],
+      });
+      const rt = new CopilotRuntime({ provider, agent, copilots: [idleCopilot] });
+      await rt.activate("idle-d");
+      provider.emit("room-1", { type: "presence-changed", connectionId: "u1", presence: {} });
+
+      await rt.deactivate("idle-d");
+      // Advancing well past idleMs must NOT invoke the agent post-deactivate.
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(agentCalls).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("test_untrusted_text_is_role_isolated (#218)", async () => {
     const provider = makeMemoryProvider();
     let capturedOpts: Record<string, unknown> | undefined;
