@@ -50,11 +50,11 @@ Per-task detail (Files to edit, TDD, Acceptance, Concurrency tests, Failure scen
 | T6.5 | Phase 6 | streamObject: real schema, not passthrough (#224) | committed | ✓ | defer | n/a | 877a6ee |
 | T6.6 | Phase 6 | Budget charges actual usage, not a fixed estimate (#174) | committed | ✓ | defer | n/a | b9f9ea3 |
 | T6.7 | Phase 6 | Reconcile copilot README with CopilotProvider props & hook signatures (#172, #173) | committed | n/a | defer | n/a | 49aa923 |
-| T7.1 | Phase 7 | Implement the `reset --force` destructive guard (#168) | pending | — | — | — | — |
-| T7.2 | Phase 7 | Forward `driver`/`url` to drizzle-kit (#169) | pending | — | — | — | — |
-| T7.3 | Phase 7 | `seed` runs the user seed script (#170) | pending | — | — | — | — |
-| T7.4 | Phase 7 | Fix the no-op CLI conflict guard (#171) | pending | — | — | — | — |
-| T7.5 | Phase 7 | Devtools iframe sandbox + studioUrl from options (#206, #207) | pending | — | — | — | — |
+| T7.1 | Phase 7 | Implement the `reset --force` destructive guard (#168) | committed | ✓ | defer | n/a | 30efd06 |
+| T7.2 | Phase 7 | Forward `driver`/`url` to drizzle-kit (#169) | committed | ✓ | defer | n/a | fb9ab0c |
+| T7.3 | Phase 7 | `seed` runs the user seed script (#170) | committed | ✓ | defer | n/a | 1ba8408 |
+| T7.4 | Phase 7 | Fix the no-op CLI conflict guard (#171) | committed | ✓ | defer | n/a | e91aefe |
+| T7.5 | Phase 7 | Devtools iframe sandbox + studioUrl from options (#206, #207) | committed | ✓ | defer | n/a | 2c2b237 |
 | T8.1 | Phase 8 | Email: real happy-path render test (#228) | pending | — | — | — | — |
 | T8.2 | Phase 8 | Forms: test the real component, not a copy (#227) | pending | — | — | — | — |
 | T9.1 | Phase 9 | Reduce CC of the 8 flagged functions (#182,#183,#184,#185,#186,#187,#188,#189) | pending | — | — | — | — |

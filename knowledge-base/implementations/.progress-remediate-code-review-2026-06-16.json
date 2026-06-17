@@ -793,6 +793,133 @@
     "commit"
    ],
    "note": "#172/#173 README Quick start aligned to real API (userConnectionId, no runtime prop, object-arg hooks); code was source of truth (no code change). quickstart.test.tsx renders documented path as doc-as-test guard. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T7.1",
+   "task_id": "T7.1",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "30efd06",
+   "files": [
+    "packages/plugin-db-drizzle/src/cli/db.ts",
+    "packages/plugin-db-drizzle/tests/cli.test.ts",
+    ".changeset/db-drizzle-reset-requires-force.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#168 reset flagged requiresForce on DbCommand (descriptor); runner enforces --force (has argv). pure factory can't access user flags - tested surface is the flag. SEPA pre-RED noted reset/seed are fabricated drizzle-kit verbs (separate unflagged concern)."
+  },
+  {
+   "id": "T7.2",
+   "task_id": "T7.2",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "fb9ab0c",
+   "files": [
+    "packages/plugin-db-drizzle/src/cli/db.ts",
+    "packages/plugin-db-drizzle/tests/cli.test.ts",
+    ".changeset/db-drizzle-forward-connection-opts.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#169 forward --dialect(mapped from driver, NOT --driver)/--url for connection verbs (migrate/push/studio/check); generate excluded; undefined guarded. SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T7.3",
+   "task_id": "T7.3",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "1ba8408",
+   "files": [
+    "packages/plugin-db-drizzle/src/cli/db.ts",
+    "packages/plugin-db-drizzle/src/options.ts",
+    "packages/plugin-db-drizzle/tests/cli.test.ts",
+    ".changeset/db-drizzle-seed-runs-user-script.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#170 seed kind:user-script runs seedScript (throws clear error if unset); DbCommand gains kind discriminant; seedScript added to options (pure; register-time package.json read deferred to runner). 2 existing tests updated (encoded old buggy seed-as-passthrough). SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T7.4",
+   "task_id": "T7.4",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "e91aefe",
+   "files": [
+    "packages/plugin-db-drizzle/src/index.ts",
+    "packages/plugin-db-drizzle/tests/register.test.ts",
+    ".changeset/db-drizzle-cli-conflict-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#171 conflict branch now warns+extends (observable) vs silent fresh register; was identical no-op. warn+extend defensible given no getCliCommand API (stronger error-on-dup needs API change, backlog). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T7.5",
+   "task_id": "T7.5",
+   "phase": 7,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "2c2b237",
+   "files": [
+    "packages/plugin-db-drizzle/src/devtools.ts",
+    "packages/plugin-db-drizzle/src/options.ts",
+    "packages/plugin-db-drizzle/tests/devtools.test.ts",
+    ".changeset/db-drizzle-devtools-sandbox-and-url.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#206 sandbox 'allow-scripts' only (dropped allow-same-origin escape pair; studio is cross-origin); #207 studioUrl from studioHost/studioPort options (default localhost:4983). SEPA pre-COMMIT GO."
   }
  ]
 }
