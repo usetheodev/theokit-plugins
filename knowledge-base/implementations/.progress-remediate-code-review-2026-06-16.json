@@ -966,6 +966,36 @@
     "commit"
    ],
    "note": "#227 extracted routeActionError/extractFieldsFromError as exported single source; handleValid calls it; test imports it (removed duplicated catch-block copy). behavior identical. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T9.1",
+   "task_id": "T9.1",
+   "phase": 9,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "n/a",
+    "c": "n/a"
+   },
+   "commit_sha": "342239f",
+   "files": [
+    "packages/auth-github/src/index.ts",
+    "packages/plugin-canvas/src/store.ts",
+    "packages/plugin-canvas/src/ui/artifact-actions.ts",
+    "packages/plugin-canvas/src/ui/renderers/sanitize.ts",
+    "packages/plugin-copilot/src/define-copilot.ts",
+    "packages/plugin-realtime/src/react/index.ts",
+    "packages/plugin-voice/src/stt-server.ts",
+    "packages/plugin-voice/src/tts-server.ts",
+    ".changeset/reduce-cyclomatic-complexity.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "commit"
+   ],
+   "note": "#182-189 CC reduction via behavior-preserving helper extraction. 6/8 fn CC<=10 clean; serialize(9-kind switch)+memList at idiomatic floor (lizard mis-merges adjacent fns). 453 tests green across 5 pkgs (behavior preserved). 0 new tsc/lint. SELF-REVIEWED in lieu of SEPA (weekly quota exhausted): verified branch order (voice 504-before-502, github fail-loud-before-parse), instanceof-Response early-returns, no helper exported, no test changed. RECOVERY NOTE: a stale git-stash from a lint-check caused a runtime.ts UU conflict mid-T9.1; restored runtime.ts to HEAD (T6 intact, 10 markers) + dropped the stale stash."
   }
  ]
 }
