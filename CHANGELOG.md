@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- plugin-copilot: a throw from the typing-indicator update (`setTyping(true)`) at the start of an agent invocation now releases the held budget reservation instead of leaking it — the call was moved inside the try that owns the reconcile/release path (review finding F-conc-2)
 - plugin-copilot: the per-room round-robin dispatcher state (`roundRobinCursor`/`roundRobinDecision`) is now pruned when a room's last copilot unregisters, fixing an unbounded-memory growth across long-running processes that cycle through many transient rooms. Pruning is guarded so a room with remaining copilots keeps its rotation state (review finding F-arch-2)
 - plugin-voice: `<VoiceRecorderBar>` now passes its `onError` handler to the recorder, so a `MediaRecorder` error that fires mid-recording (no `stop()` pending) surfaces via the bar's `onError` + error state instead of being silently lost while the bar stays in the recording state. The `recorderFactory` test seam now receives the recorder options (review finding F-wire-1)
 - plugin-copilot: the README Quick start now matches the real API — `CopilotProvider` takes `userConnectionId` (not `localConnectionId`) and has no `runtime` prop, and the headless hooks use their object-argument signatures (`useCopilotReadable({ description, value })`, `useCopilotTool({ name, description, handler })`). The documented integration path now compiles and runs as written (guarded by a test that mirrors it) (#172, #173)

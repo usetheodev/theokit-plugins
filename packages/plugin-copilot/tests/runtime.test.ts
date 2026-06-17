@@ -717,6 +717,36 @@ describe("CopilotRuntime", () => {
     expect(prompt).not.toContain(SYSTEM);
   });
 
+  it("test_setTyping_throw_releases_reservation (#F-conc-2)", async () => {
+    // F-conc-2: if setTyping(true) throws, the held budget reservation must be
+    // released (not leaked). Pre-fix setTyping(true) sits OUTSIDE the inner try,
+    // so the throw propagates past release → budget stays held (getUsage 0.5).
+    const provider = makeMemoryProvider();
+    let presenceCalls = 0;
+    const origUpdate = provider.updatePresence.bind(provider);
+    provider.updatePresence = async (roomId, connectionId, patch) => {
+      presenceCalls++;
+      if (presenceCalls === 1) throw new Error("presence update failed");
+      return origUpdate(roomId, connectionId, patch);
+    };
+    const copilot = defineCopilot({
+      ...baseCopilot,
+      id: "typing-throw",
+      budget: { perRoom: { dailyUsd: 1 } },
+    });
+    const rt = new CopilotRuntime({
+      provider,
+      agent: makeAgent("ok"),
+      copilots: [copilot],
+      estimatedCostPerInvocationUsd: 0.5,
+    });
+    await rt.activate("typing-throw");
+    provider.emit("room-1", { type: "broadcast", connectionId: "user-1", event: "question", payload: { text: "hi" } });
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(rt.getUsage("typing-throw")?.dailyUsedUsd).toBe(0);
+  });
+
   it("test_idle_and_broadcast_do_not_double_spend (#F-tests-1)", async () => {
     // F-tests-1 regression guard — BORN-GREEN: the reservation model
     // (BudgetBridge.reserve → hold → reconcile/release, routed through the

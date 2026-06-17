@@ -289,10 +289,12 @@ export class CopilotRuntime {
       return;
     }
 
-    await reg.member.setTyping(true);
-
     let finalText = "";
     try {
+      // #F-conc-2: setTyping(true) is INSIDE the try so a throw routes to
+      // catch→release — otherwise a failed typing-indicator update would leak
+      // the held reservation.
+      await reg.member.setTyping(true);
       // Resolve apiKey thunk (supports lazy / rotated keys).
       const resolvedApiKey =
         typeof reg.descriptor.agent.apiKey === "function"
