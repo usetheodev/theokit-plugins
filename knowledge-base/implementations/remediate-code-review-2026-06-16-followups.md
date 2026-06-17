@@ -1,3 +1,0 @@
-# Follow-ups (out-of-scope opportunistic items surfaced during /implement)
-
-- **T1.3 (#177) styling regression risk:** `sanitizeSvg` uses DOMPurify `USE_PROFILES:{svg:true}` which strips `<style>` blocks. Mermaid emits inline `<style>` for theming, so sanitized mermaid diagrams render shapes but may lose colors/fonts. Security (the #177 contract) is preserved; styling is a separate concern. Follow-up: either a mermaid-specific sanitize profile that allows `<style>` with CSS sanitization, or accept the loss and document. SHOULD-TEST: assert a realistic mermaid SVG (with `<g>`/`<path>`/`<style>`) still renders its shapes. (SEPA post-GREEN iter 3.)

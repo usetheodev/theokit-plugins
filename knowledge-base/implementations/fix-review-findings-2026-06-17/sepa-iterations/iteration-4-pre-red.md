@@ -1,2 +1,0 @@
-# SEPA pre-RED — iter 4 — T2.2 (F-conc-2)
-Move `await reg.member.setTyping(true)` from :292 (between the two try blocks) into the inner try at :295 (first stmt). catch release + finally settled-once handle it. Line 322 setTyping(true,progress) STAYS. RED: provider.updatePresence throws on 1st call → pre-fix throw propagates past release (budget held=0.5) → getUsage shows 0.5 not 0. Post-fix: catch→release→getUsage 0. Scope runtime.ts + test. finally setTyping(false) is call#2 (succeeds, no mask). SEPA GO.
