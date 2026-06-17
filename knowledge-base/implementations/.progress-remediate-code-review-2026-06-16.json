@@ -617,6 +617,182 @@
     "commit"
    ],
    "note": "#175 doc-only: index.ts docstring corrected to real handler signatures (input,config,opts?). No CHANGELOG/changeset (internal doc, not consumer-facing per Rule 6). typecheck baseline unchanged."
+  },
+  {
+   "id": "T6.1",
+   "task_id": "T6.1",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "33dbbb9",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-prompt-injection-isolation.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#218 framePrompt returns user-role-only fenced content (frameUntrusted strips forged markers); trusted systemPrompt passed separately to streamObject. role separation + framing (OWASP LLM01). all 3 branches de-contaminated. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.2",
+   "task_id": "T6.2",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "34202f8",
+   "files": [
+    "packages/plugin-copilot/src/internal/budget-bridge.ts",
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/budget-bridge.test.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-budget-race-and-idle-guard.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#219/#223/#221/EC-2: idle routed through per-copilot enqueue (serializes w/ broadcast); BudgetBridge reserve(atomic check+hold)/reconcile(actual,clamp,window-epoch)/release(EC-2) with settled-once; reg.active flag flipped first in deactivate + checked in idle task + _handleFrame. reconcile passes est (T6.6 wires real). preflightCheck/charge kept as shims. SEPA pre-RED/post-GREEN+pre-COMMIT GO (2 CRITICALs resolved)."
+  },
+  {
+   "id": "T6.3",
+   "task_id": "T6.3",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "6a6eb0f",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-handleframe-error-logged.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#222 enqueue catch logs copilotId/roomId/error (console.error, package precedent) instead of empty swallow; chain stays alive. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.4",
+   "task_id": "T6.4",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "d04d3bb",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-round-robin-keyed-by-room.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#220 round-robin cursor keyed by roomId (not connectionId) + dispatch-once-per-frame memo (roomId,frame===) so cursor advances 1x/frame -> exactly one responder/frame rotating. DEVIATION: key-only was observable no-op (per-copilot double-advance degraded to 'all'); memo required to satisfy intent (SEPA-vetted, in runtime.ts). SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T6.5",
+   "task_id": "T6.5",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "877a6ee",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-streamobject-real-schema.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#224 real z.object({text:z.string()}) schema passed to streamObject (was passthrough that disabled validation). SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.6",
+   "task_id": "T6.6",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "b9f9ea3",
+   "files": [
+    "packages/plugin-copilot/src/types.ts",
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-budget-actual-cost.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "#174 complete event gains optional usage.costUsd; runAgent reconciles to actual (finite) else estimate fallback. builds on T6.2 reservation. additive type. SEPA pre-COMMIT GO."
+  },
+  {
+   "id": "T6.7",
+   "task_id": "T6.7",
+   "phase": 6,
+   "status": "committed",
+   "wiring": {
+    "a": "n/a",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "49aa923",
+   "files": [
+    "packages/plugin-copilot/README.md",
+    "packages/plugin-copilot/tests/react/quickstart.test.tsx",
+    ".changeset/copilot-readme-quickstart-alignment.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "commit"
+   ],
+   "note": "#172/#173 README Quick start aligned to real API (userConnectionId, no runtime prop, object-arg hooks); code was source of truth (no code change). quickstart.test.tsx renders documented path as doc-as-test guard. SEPA pre-COMMIT GO."
   }
  ]
 }

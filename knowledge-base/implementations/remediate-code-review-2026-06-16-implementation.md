@@ -43,13 +43,13 @@ Per-task detail (Files to edit, TDD, Acceptance, Concurrency tests, Failure scen
 | T5.5 | Phase 5 | use-tts: cancel stale playback on newer speak()/stop() (#216, test #238) | committed | ✓ | defer | n/a | 18fc976 |
 | T5.6 | Phase 5 | voice-recorder-bar: guard STT JSON parse (#217) | committed | ✓ | defer | n/a | 1d8ee52 |
 | T5.7 | Phase 5 | Fix stale docstring in voice index (#175) | committed | n/a | n/a | n/a | 868b64b |
-| T6.1 | Phase 6 | Isolate untrusted room text into a user-role message (#218, test #232) | pending | — | — | — | — |
-| T6.2 | Phase 6 | One per-copilot queue + atomic budget; idle-trigger guarded (#219, #223, #221, test #233) | pending | — | — | — | — |
-| T6.3 | Phase 6 | handleFrame: log errors instead of empty catch (#222) | pending | — | — | — | — |
-| T6.4 | Phase 6 | Round-robin dispatcher: key cursor by roomId (#220) | pending | — | — | — | — |
-| T6.5 | Phase 6 | streamObject: real schema, not passthrough (#224) | pending | — | — | — | — |
-| T6.6 | Phase 6 | Budget charges actual usage, not a fixed estimate (#174) | pending | — | — | — | — |
-| T6.7 | Phase 6 | Reconcile copilot README with CopilotProvider props & hook signatures (#172, #173) | pending | — | — | — | — |
+| T6.1 | Phase 6 | Isolate untrusted room text into a user-role message (#218, test #232) | committed | ✓ | defer | n/a | 33dbbb9 |
+| T6.2 | Phase 6 | One per-copilot queue + atomic budget; idle-trigger guarded (#219, #223, #221, test #233) | committed | ✓ | defer | n/a | 34202f8 |
+| T6.3 | Phase 6 | handleFrame: log errors instead of empty catch (#222) | committed | ✓ | defer | n/a | 6a6eb0f |
+| T6.4 | Phase 6 | Round-robin dispatcher: key cursor by roomId (#220) | committed | ✓ | defer | n/a | d04d3bb |
+| T6.5 | Phase 6 | streamObject: real schema, not passthrough (#224) | committed | ✓ | defer | n/a | 877a6ee |
+| T6.6 | Phase 6 | Budget charges actual usage, not a fixed estimate (#174) | committed | ✓ | defer | n/a | b9f9ea3 |
+| T6.7 | Phase 6 | Reconcile copilot README with CopilotProvider props & hook signatures (#172, #173) | committed | n/a | defer | n/a | 49aa923 |
 | T7.1 | Phase 7 | Implement the `reset --force` destructive guard (#168) | pending | — | — | — | — |
 | T7.2 | Phase 7 | Forward `driver`/`url` to drizzle-kit (#169) | pending | — | — | — | — |
 | T7.3 | Phase 7 | `seed` runs the user seed script (#170) | pending | — | — | — | — |
@@ -76,3 +76,4 @@ Per cycle-implement.md, deviations from the plan are logged, not silently absorb
 - **T3.1 (#190)** — the plan's ADR D6 prescribed binding magic-link callbacks to `tx.state`. Owner-approved deviation to the **documented-bearer model**: magic-link is cross-device by design (no initiating-browser cookie), so `tx.state` binding would break the core feature and an optional binding is security theatre. D6's rejection of the bearer model rested on a false premise (magic-link throws in `createAuthorizationURL`, has no tx-producing issuance path). Security rests on 32-byte entropy + short TTL + single-use + hash-at-rest. Documented in code comment + CHANGELOG + changeset.
 - **T3.3 (#192)** — the finding's sub-fix (c) prescribed "validate discovered endpoint hosts against the configured base host". Rejected: real Google discovery spans `accounts.google.com` / `oauth2.googleapis.com` / `openidconnect.googleapis.com`, so strict host-equality would break production. Replaced by **https-except-loopback** on the base + all 3 discovered endpoints, which closes the same plaintext-exfil vector without the multi-host breakage. The "build-time flag" sub-fix (a) — impractical in a published JS lib — was replaced by a **loopback-only restriction** on the env override. Documented in code comment + test header + CHANGELOG + changeset.
 - **T4.1 (#193)** — the plan's RED prescribed concurrent `joinRoom`, but `joinRoom` never calls `ensureYjs` (presence-only) so it constructs zero `Y.Doc`s and cannot reproduce the race (the prescribed RED would be born-GREEN). The RED instead uses concurrent **`applyYjsUpdate`** (the only path that reaches `ensureYjs`), asserting exactly one `Y.Doc` is constructed via a `vi.mock`'d Doc-constructor counter. The GC-during-init orphan window is deferred to T4.2/#194 (TODO in code). Documented in test header + changeset.
+- **T6.4 (#220)** — the finding's literal instruction ("key the round-robin cursor by room.id, not connectionId") is, on its own, an **observable no-op**: `_handleFrame` runs once per copilot and the round-robin branch mutated the cursor on every call, so the cursor advanced N times per frame and every copilot selected itself (round-robin already degraded to `all`). Re-keying alone changes nothing. The fix therefore ALSO memoizes the dispatch decision per (room, frame-identity `===`) so the cursor advances exactly once per frame — making the room-keying observable and round-robin actually fair. SEPA-vetted as required-to-satisfy-intent, not scope creep (stayed in `runtime.ts`). Documented in code comment + CHANGELOG + changeset. Relies on the provider passing the same frame object reference to all subscribers (true for the memory/realtime fanout).
