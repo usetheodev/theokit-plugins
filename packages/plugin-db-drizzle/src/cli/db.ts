@@ -18,6 +18,12 @@ import type { ResolvedDrizzleDbOptions } from "../options.js";
 export interface DbCommand {
   readonly verb: DbVerb;
   readonly summary: string;
+  /**
+   * #168: destructive verb the runner MUST gate behind an explicit `--force`
+   * flag before executing. Enforcement lives in the CLI runner (it has the
+   * user's argv); this descriptor only declares the requirement.
+   */
+  readonly requiresForce?: boolean;
   /** Build the drizzle-kit args array for this verb given resolved options. */
   buildArgs(opts: ResolvedDrizzleDbOptions): string[];
 }
@@ -52,6 +58,8 @@ export function buildDbCommands(opts: ResolvedDrizzleDbOptions): DbCommand[] {
   return VERBS.map((verb) => ({
     verb,
     summary: SUMMARIES[verb],
+    // #168: `reset` is destructive (drops the DB) — the runner must require --force.
+    ...(verb === "reset" ? { requiresForce: true } : {}),
     buildArgs: () => baseArgs(verb, opts),
   }));
 }

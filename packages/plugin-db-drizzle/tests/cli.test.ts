@@ -80,6 +80,17 @@ describe("buildDbCommands (P#5 T2.1) — 7 verbs", () => {
     expect(args).toContain("./drizzle/migrations");
   });
 
+  it("test_reset_requires_force (#168)", () => {
+    // The destructive `reset` verb must be FLAGGED as force-requiring so the
+    // runner refuses it without --force. (Enforcement is runner-side; here we
+    // assert the descriptor carries the guard signal — currently absent.)
+    const opts = resolveOptions({ driver: "sqlite", url: ":memory:" });
+    const reset = buildDbCommands(opts).find((c) => c.verb === "reset");
+    expect(reset?.requiresForce).toBe(true);
+    const migrate = buildDbCommands(opts).find((c) => c.verb === "migrate");
+    expect(migrate?.requiresForce ?? false).toBe(false);
+  });
+
   it("non-generate verbs do NOT include --out flag", () => {
     const opts = resolveOptions({
       driver: "sqlite",
