@@ -488,6 +488,67 @@ describe("CopilotRuntime", () => {
     expect(rt.getUsage("rel-test")?.dailyUsedUsd).toBe(0);
   });
 
+  it("test_getusage_reflects_actual_cost (#174)", async () => {
+    const provider = makeMemoryProvider();
+    const ACTUAL = 0.037;
+    const costAgent: CopilotAgentLike = {
+      async *streamObject<T>() {
+        yield {
+          type: "complete" as const,
+          object: { text: "ok" } as unknown as T,
+          usage: { costUsd: ACTUAL },
+        };
+      },
+    };
+    const copilot = defineCopilot({
+      ...baseCopilot,
+      id: "cost-test",
+      budget: { perRoom: { dailyUsd: 1 } },
+    });
+    const rt = new CopilotRuntime({
+      provider,
+      agent: costAgent,
+      copilots: [copilot],
+      estimatedCostPerInvocationUsd: 0.5,
+    });
+    await rt.activate("cost-test");
+    provider.emit("room-1", {
+      type: "broadcast",
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "hi" },
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    // #174: usage must reflect the ACTUAL reported cost, not the 0.5 estimate.
+    expect(rt.getUsage("cost-test")?.dailyUsedUsd).toBeCloseTo(ACTUAL, 4);
+  });
+
+  it("test_getusage_falls_back_to_estimate_when_no_cost_reported (#174)", async () => {
+    const provider = makeMemoryProvider();
+    const copilot = defineCopilot({
+      ...baseCopilot,
+      id: "est-test",
+      budget: { perRoom: { dailyUsd: 1 } },
+    });
+    const rt = new CopilotRuntime({
+      provider,
+      agent: makeAgent("ok"), // yields complete WITHOUT usage
+      copilots: [copilot],
+      estimatedCostPerInvocationUsd: 0.25,
+    });
+    await rt.activate("est-test");
+    provider.emit("room-1", {
+      type: "broadcast",
+      connectionId: "user-1",
+      event: "question",
+      payload: { text: "hi" },
+    });
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(rt.getUsage("est-test")?.dailyUsedUsd).toBeCloseTo(0.25, 4);
+  });
+
   it("test_handleframe_error_logged_with_context (#222)", async () => {
     const provider = makeMemoryProvider();
     const throwingAgent: CopilotAgentLike = {

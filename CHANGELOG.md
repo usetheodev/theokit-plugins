@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- plugin-copilot: budget usage now reflects the provider's actual reported cost (from the agent's `complete` event `usage.costUsd`) instead of always charging a fixed per-invocation estimate; when the provider reports no cost, it falls back to the configured estimate. Builds on the reservation model (the reservation is reconciled to the actual on completion) (#174)
 - plugin-copilot: the agent completion is now validated against a real `z.object({ text: z.string() })` schema instead of a passthrough that accepted any shape — a non-conforming completion is rejected rather than silently coerced (#224)
 - plugin-copilot: the `round-robin` dispatcher now rotates fairly across copilots in a room. The cursor is keyed by room (not by connection) and the dispatch decision is computed once per frame, so exactly one copilot responds per frame and rotation is shared across connections — previously every copilot responded to every frame (round-robin behaved like `all`) (#220)
 - plugin-copilot: a failed queued frame/idle task is now logged with copilot + room context instead of being silently swallowed by an empty catch — the chain stays alive but failures are observable (#222)
