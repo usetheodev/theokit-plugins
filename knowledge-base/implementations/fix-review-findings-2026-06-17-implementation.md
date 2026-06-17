@@ -19,8 +19,8 @@
 |---|---|---|---|---|---|---|
 | T1.1 | Phase 1 | Wire recorder onError into VoiceRecorderBar | F-wire-1 | HIGH | committed | 856c667 |
 | T1.2 | Phase 1 | Runtime idle+broadcast double-spend test | F-tests-1 | HIGH | committed | done |
-| T2.1 | Phase 2 | Prune round-robin Maps on empty-room teardown | F-arch-2 | HIGH | pending | — |
-| T2.2 | Phase 2 | Release reservation if setTyping(true) throws | F-conc-2 | LOW | pending | — |
+| T2.1 | Phase 2 | Prune round-robin Maps on empty-room teardown | F-arch-2 | HIGH | committed | done |
+| T2.2 | Phase 2 | Release reservation if setTyping(true) throws | F-conc-2 | LOW | committed | done |
 | T3.1 | Phase 3 | DOMPurify-driven verdict for sanitizeHtmlSrcdoc | F-arch-1/F-sec-1 | HIGH | pending | — |
 | T3.2 | Phase 3 | frameUntrusted fixpoint fence-strip | F-sec-2 | MEDIUM | pending | — |
 | T3.3 | Phase 3 | Remove 0.0.0.0 from isLoopbackHost | F-sec-3 | LOW | pending | — |

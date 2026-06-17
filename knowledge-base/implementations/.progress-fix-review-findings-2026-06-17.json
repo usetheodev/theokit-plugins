@@ -48,6 +48,58 @@
     "commit"
    ],
    "note": "F-tests-1 test-only born-GREEN regression guard: concurrent idle+broadcast vs tight budget charges once (deferred agent holds reservation; idle queued behind; advance-timers before resolve). SEPA pre-RED/pre-COMMIT GO."
+  },
+  {
+   "id": "T2.1",
+   "task_id": "T2.1",
+   "phase": 2,
+   "status": "committed",
+   "finding": "F-arch-2",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "9c35fc8",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-prune-round-robin-maps.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "F-arch-2 prune both round-robin maps in unregisterCopilot when copilotsInRoom empty (ADR D2 guard). RED via 2-copilot stale-cursor vector (single fast-path bypasses). SEPA GO."
+  },
+  {
+   "id": "T2.2",
+   "task_id": "T2.2",
+   "phase": 2,
+   "status": "committed",
+   "finding": "F-conc-2",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "70464c5",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    ".changeset/copilot-release-reservation-on-settyping-throw.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "F-conc-2 setTyping(true) moved inside inner try -> throw routes to catch->release (no budget leak). RED via provider.updatePresence throw on 1st call. SEPA GO."
   }
  ]
 }
