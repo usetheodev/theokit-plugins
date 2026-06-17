@@ -17,8 +17,8 @@
 
 | # | Plan ref | Title | Finding | Sev | Status | SHA |
 |---|---|---|---|---|---|---|
-| T1.1 | Phase 1 | Wire recorder onError into VoiceRecorderBar | F-wire-1 | HIGH | pending | — |
-| T1.2 | Phase 1 | Runtime idle+broadcast double-spend test | F-tests-1 | HIGH | pending | — |
+| T1.1 | Phase 1 | Wire recorder onError into VoiceRecorderBar | F-wire-1 | HIGH | committed | 856c667 |
+| T1.2 | Phase 1 | Runtime idle+broadcast double-spend test | F-tests-1 | HIGH | committed | done |
 | T2.1 | Phase 2 | Prune round-robin Maps on empty-room teardown | F-arch-2 | HIGH | pending | — |
 | T2.2 | Phase 2 | Release reservation if setTyping(true) throws | F-conc-2 | LOW | pending | — |
 | T3.1 | Phase 3 | DOMPurify-driven verdict for sanitizeHtmlSrcdoc | F-arch-1/F-sec-1 | HIGH | pending | — |

@@ -1,1 +1,53 @@
-{"slug":"fix-review-findings-2026-06-17","tasks":[]}
+{
+ "slug": "fix-review-findings-2026-06-17",
+ "tasks": [
+  {
+   "id": "T1.1",
+   "task_id": "T1.1",
+   "phase": 1,
+   "status": "committed",
+   "finding": "F-wire-1",
+   "wiring": {
+    "a": "pass",
+    "b": "defer",
+    "c": "n/a"
+   },
+   "commit_sha": "856c667",
+   "files": [
+    "packages/plugin-voice/src/ui/voice-recorder-bar.tsx",
+    "packages/plugin-voice/tests/voice-recorder-bar.test.tsx",
+    ".changeset/voice-recorder-bar-wire-onerror.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "F-wire-1 bar passes {onError:surface} to createRecorder; recorderFactory widened to (opts?)=>Recorder. SEPA pre-RED + pre-COMMIT GO."
+  },
+  {
+   "id": "T1.2",
+   "task_id": "T1.2",
+   "phase": 1,
+   "status": "committed",
+   "finding": "F-tests-1",
+   "wiring": {
+    "a": "n/a",
+    "b": "n/a",
+    "c": "n/a"
+   },
+   "commit_sha": "5b4a803",
+   "files": [
+    "packages/plugin-copilot/tests/runtime.test.ts"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "commit"
+   ],
+   "note": "F-tests-1 test-only born-GREEN regression guard: concurrent idle+broadcast vs tight budget charges once (deferred agent holds reservation; idle queued behind; advance-timers before resolve). SEPA pre-RED/pre-COMMIT GO."
+  }
+ ]
+}
