@@ -100,6 +100,114 @@
     "commit"
    ],
    "note": "F-conc-2 setTyping(true) moved inside inner try -> throw routes to catch->release (no budget leak). RED via provider.updatePresence throw on 1st call. SEPA GO."
+  },
+  {
+   "id": "T3.1",
+   "task_id": "T3.1",
+   "phase": 3,
+   "status": "committed",
+   "finding": "F-arch-1/F-sec-1",
+   "wiring": {
+    "a": "pass",
+    "b": "pass",
+    "c": "n/a"
+   },
+   "commit_sha": "d173838",
+   "files": [
+    "packages/plugin-canvas/src/ui/renderers/sanitize.ts",
+    "packages/plugin-canvas/tests/sanitize.test.ts",
+    "CHANGELOG.md",
+    ".changeset/canvas-srcdoc-removal-driven-verdict.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "F-arch-1/F-sec-1 sanitizeHtmlSrcdoc verdict now DOMPurify.removed-driven (WHOLE_DOCUMENT:true so <meta> is recorded; OR-fold all dangerous flags into removedScript for the schema.ts html gate). Old regex required quoted http-equiv -> unquoted meta-refresh bypassed. 6 RED tests (unquoted meta, iframe, on-handler, script, js-url, clean). Caller html-artifact.tsx + schema.ts; integ schema.test.ts/route-handlers.test.ts. SEPA pre-RED/post-GREEN/pre-COMMIT GO."
+  },
+  {
+   "id": "T3.2",
+   "task_id": "T3.2",
+   "phase": 3,
+   "status": "committed",
+   "finding": "F-sec-2",
+   "wiring": {
+    "a": "pass",
+    "b": "pass",
+    "c": "n/a"
+   },
+   "commit_sha": "3cd718a",
+   "files": [
+    "packages/plugin-copilot/src/internal/runtime.ts",
+    "packages/plugin-copilot/tests/runtime.test.ts",
+    "CHANGELOG.md",
+    ".changeset/copilot-frameuntrusted-fixpoint-strip.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "F-sec-2 frameUntrusted now strips fence markers to a fixpoint (loop until stable). 4 vectors A(OPEN self-recon) B(CLOSE self-recon) C(cross-marker, regression guard) D(deep nest). SEPA pre-RED/post-GREEN/pre-COMMIT GO. Residual casing/homoglyph out of scope."
+  },
+  {
+   "id": "T3.3",
+   "task_id": "T3.3",
+   "phase": 3,
+   "status": "committed",
+   "finding": "F-sec-3",
+   "wiring": {
+    "a": "pass",
+    "b": "pass",
+    "c": "n/a"
+   },
+   "commit_sha": "298e5d6",
+   "files": [
+    "packages/auth-google/src/index.ts",
+    "packages/auth-google/tests/google-provider.test.ts",
+    "CHANGELOG.md",
+    ".changeset/auth-google-reject-wildcard-host.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "F-sec-3 removed 0.0.0.0 from isLoopbackHost exemption (wildcard bind != loopback dest). 2 vectors: http://0.0.0.0:8080 + normalized http://0:8080. localhost/127/::1 still exempt (existing regression test). SEPA pre-RED/post-GREEN+pre-COMMIT GO."
+  },
+  {
+   "id": "T4.1",
+   "task_id": "T4.1",
+   "phase": 4,
+   "status": "committed",
+   "finding": "F-dom-pay-5",
+   "wiring": {
+    "a": "pass",
+    "b": "pass",
+    "c": "n/a"
+   },
+   "commit_sha": "c43d8e6",
+   "files": [
+    "packages/plugin-payments/src/webhook.ts",
+    "packages/plugin-payments/tests/webhook.test.ts",
+    "CHANGELOG.md",
+    ".changeset/payments-redact-release-error-log.md"
+   ],
+   "phases_completed": [
+    "red",
+    "green",
+    "refactor",
+    "wiring",
+    "commit"
+   ],
+   "note": "F-dom-pay-5 redactSecrets(releaseError) in release-failure log, mirroring handler-error path. RED via leaky store (markProcessed->true, release throws secret); asserts secret absent + log fired + ***REDACTED*** present. SEPA pre-RED/post-GREEN+pre-COMMIT GO."
   }
  ]
 }
