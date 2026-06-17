@@ -461,6 +461,39 @@ describe("CopilotRuntime", () => {
     expect(rt.getUsage("rel-test")?.dailyUsedUsd).toBe(0);
   });
 
+  it("test_handleframe_error_logged_with_context (#222)", async () => {
+    const provider = makeMemoryProvider();
+    const throwingAgent: CopilotAgentLike = {
+      // eslint-disable-next-line require-yield
+      async *streamObject<T>(): AsyncGenerator<{ type: "complete"; object: T }, void, void> {
+        throw new Error("frame boom");
+      },
+    };
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const rt = new CopilotRuntime({ provider, agent: throwingAgent, copilots: [baseCopilot] });
+      await rt.activate("c1");
+      provider.emit("room-1", {
+        type: "broadcast",
+        connectionId: "user-1",
+        event: "question",
+        payload: { text: "hi" },
+      });
+      await new Promise((r) => setTimeout(r, 30));
+
+      // #222: the queued-task failure must be logged with copilot/room context,
+      // not swallowed by an empty catch.
+      expect(errSpy).toHaveBeenCalled();
+      const ctx = errSpy.mock.calls
+        .flat()
+        .find((a): a is Record<string, unknown> => typeof a === "object" && a !== null && "copilotId" in a);
+      expect(ctx?.copilotId).toBe("c1");
+      expect(ctx?.roomId).toBe("room-1");
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
   it("test_idle_runagent_blocked_after_deactivate (#221)", async () => {
     vi.useFakeTimers();
     try {

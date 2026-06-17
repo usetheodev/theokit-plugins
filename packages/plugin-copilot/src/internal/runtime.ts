@@ -208,7 +208,15 @@ export class CopilotRuntime {
    */
   private enqueue(id: string, task: () => Promise<void>): Promise<void> {
     const prev = this.queues.get(id) ?? Promise.resolve();
-    const next = prev.then(task).catch(() => {});
+    const next = prev.then(task).catch((err: unknown) => {
+      // #222: a failed queued task must be observable (not swallowed). Keep the
+      // chain alive but log with copilot/room context so failures are diagnosable.
+      console.error("[plugin-copilot] queued task failed", {
+        copilotId: id,
+        roomId: this.registry.get(id)?.descriptor.room.id,
+        error: err,
+      });
+    });
     this.queues.set(id, next);
     return next;
   }
