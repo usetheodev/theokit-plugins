@@ -1,80 +1,43 @@
 /**
- * T3.4 — TheoForm error-propagation logic regression test.
+ * #227 — TheoForm error-routing regression test.
  *
- * TheoForm's handleValid callback distinguishes ActionInputError-shaped
- * errors (duck-typed via `fields` property) from arbitrary errors. The
- * former get routed to RHF's setError; the latter are re-thrown.
- *
- * This test exercises the extractFieldsFromError + re-throw logic directly,
- * because mounting <TheoForm> requires @theokit/react's useAction + a
- * DOM environment that may not be fully wired in CI for this package's
- * peer deps. The logic under test lives in TheoForm.tsx:handleValid's
- * catch block.
+ * Previously this test DUPLICATED the catch-block logic (a private copy of
+ * `extractFieldsFromError` + a hand-written `simulateHandleValidCatch`), so it
+ * could pass even if the real component diverged. It now imports the SINGLE
+ * SOURCE the component itself uses — `routeActionError` / `extractFieldsFromError`
+ * exported from `TheoForm.tsx` — and asserts the real routing: ActionInputError
+ * `fields` → RHF `setError`; any other error → re-thrown (fail-fast).
  */
 import { describe, expect, it, vi } from "vitest";
 
-/**
- * Mirror of the duck-type detection from TheoForm.tsx (lines 186-191).
- * We test the extraction logic in isolation to verify the re-throw contract.
- */
-function extractFieldsFromError(err: unknown): Record<string, string[]> | undefined {
-  if (err === null || typeof err !== "object") return undefined;
-  const obj = err as Record<string, unknown>;
-  if (obj.fields === null || typeof obj.fields !== "object") return undefined;
-  return obj.fields as Record<string, string[]>;
-}
+import { extractFieldsFromError, routeActionError } from "../../src/components/TheoForm.js";
 
-describe("TheoForm error propagation logic", () => {
-  it("T3.4: non-ActionInputError (TypeError) is NOT recognized as field error — triggers rethrow path", () => {
-    // Arrange: a TypeError (has no `.fields` property)
-    const typeError = new TypeError("Cannot read property 'x' of undefined");
-
-    // Act: extractFieldsFromError should return undefined for a TypeError
-    const fields = extractFieldsFromError(typeError);
-
-    // Assert: undefined means the else-branch fires (throw err), not the
-    // applyActionErrorsToForm path.
-    expect(fields).toBeUndefined();
-  });
-
-  it("T3.4: ActionInputError-shaped error IS recognized as field error", () => {
-    // Arrange: duck-typed ActionInputError
+describe("TheoForm error routing (#227) — real source, no duplicated logic", () => {
+  it("test_theoform_routes_field_errors_and_rethrows", () => {
+    // Field error (ActionInputError shape) → routed to setError, NOT re-thrown.
+    const setError = vi.fn();
     const actionError = {
       type: "TheoActionInputError",
       code: "VALIDATION_ERROR",
       status: 422,
       fields: { email: ["Required"] },
     };
+    expect(() => routeActionError(actionError, setError)).not.toThrow();
+    expect(setError).toHaveBeenCalledWith("email", expect.objectContaining({ message: "Required" }));
 
-    // Act
-    const fields = extractFieldsFromError(actionError);
-
-    // Assert: fields extracted — this would route to applyActionErrorsToForm
-    expect(fields).toEqual({ email: ["Required"] });
+    // Non-field error (TypeError) → re-thrown, NOT swallowed; setError untouched.
+    const setError2 = vi.fn();
+    const boom = new TypeError("onSuccess blew up");
+    expect(() => routeActionError(boom, setError2)).toThrow(/onSuccess blew up/);
+    expect(setError2).not.toHaveBeenCalled();
   });
 
-  it("T3.4: handleValid re-throw contract — non-field errors propagate", async () => {
-    // Simulate the handleValid catch-block logic
-    const setError = vi.fn();
-    const typeError = new TypeError("onSuccess blew up");
-
-    // This mirrors handleValid's catch block at TheoForm.tsx:113-129
-    const simulateHandleValidCatch = (err: unknown) => {
-      const fields = extractFieldsFromError(err);
-      if (fields !== undefined) {
-        // Would call applyActionErrorsToForm — swallowed as form error
-        for (const [name, messages] of Object.entries(fields)) {
-          setError(name, { type: "server", message: messages[0] ?? "" });
-        }
-      } else {
-        // Re-throw — the error propagates
-        throw err;
-      }
-    };
-
-    // Assert: TypeError propagates (re-thrown), not swallowed
-    expect(() => simulateHandleValidCatch(typeError)).toThrow(TypeError);
-    expect(() => simulateHandleValidCatch(typeError)).toThrow("onSuccess blew up");
-    expect(setError).not.toHaveBeenCalled();
+  it("extractFieldsFromError recognizes ActionInputError shape, rejects others", () => {
+    expect(extractFieldsFromError({ fields: { email: ["Required"] } })).toEqual({
+      email: ["Required"],
+    });
+    expect(extractFieldsFromError(new TypeError("x"))).toBeUndefined();
+    expect(extractFieldsFromError(null)).toBeUndefined();
+    expect(extractFieldsFromError({ fields: null })).toBeUndefined();
   });
 });

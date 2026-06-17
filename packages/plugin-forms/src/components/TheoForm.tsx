@@ -107,25 +107,14 @@ function TheoFormRootInner<TInput extends FieldValues, TData>(
         const data = await action_.mutateAsync(values);
         onSuccess?.(data);
       } catch (err) {
-        // Map ActionInputError.fields into RHF setError calls so <TheoField>
-        // sub-parts surface field-level errors. Only fires when error has the
-        // duck-typed `fields` shape (G3 ActionInputError contract).
-        const fields = extractFieldsFromError(err);
-        if (fields !== undefined) {
-          // Cast: RHF's UseFormSetError has a narrower string-literal-union
-          // on the name param (Path<TInput>), but the adapter accepts plain
-          // string. The adapter is duck-typed by design (works with any RHF
-          // form, not just one with known schema keys).
-          applyActionErrorsToForm(
-            form.setError as unknown as (n: string, e: { type: string; message: string }) => void,
-            fields,
-          );
-        } else {
-          // Non-ActionInputError: rethrow so it propagates (e.g., onSuccess
-          // throwing, network errors). Swallowing arbitrary errors silently
-          // violates fail-fast — only validation errors are form-local.
-          throw err;
-        }
+        // #227: route via the shared `routeActionError` (single source the unit
+        // test also imports). Field errors → RHF setError; others re-thrown.
+        // Cast: RHF's UseFormSetError narrows `name` to Path<TInput>, but the
+        // adapter is duck-typed (works with any RHF form, not just known keys).
+        routeActionError(
+          err,
+          form.setError as unknown as (n: string, e: { type: string; message: string }) => void,
+        );
       }
     },
     [action_, form.setError, onSuccess],
@@ -183,9 +172,35 @@ export const TheoForm = Object.assign(TheoFormRoot, {
  * Per `theokit/packages/theo/src/core/contracts/action-protocol.ts:149-175`:
  *   ActionInputError { code, status, type:'TheoActionInputError', fields, issues }
  */
-function extractFieldsFromError(err: unknown): Record<string, string[]> | undefined {
+/**
+ * Duck-type an ActionInputError by its `fields` map (#227 single source — both
+ * `handleValid` and the unit test import THIS, never a copy).
+ *
+ * @public
+ */
+export function extractFieldsFromError(err: unknown): Record<string, string[]> | undefined {
   if (err === null || typeof err !== "object") return undefined;
   const obj = err as Record<string, unknown>;
   if (obj.fields === null || typeof obj.fields !== "object") return undefined;
   return obj.fields as Record<string, string[]>;
+}
+
+/**
+ * Route an action error to the form (#227): ActionInputError-shaped `fields`
+ * are bridged into RHF `setError`; any other error is re-thrown (fail-fast — we
+ * never silently swallow arbitrary errors, only validation ones are form-local).
+ * Exported so the component and its unit test share ONE implementation.
+ *
+ * @public
+ */
+export function routeActionError(
+  err: unknown,
+  setError: (name: string, error: { type: string; message: string }) => void,
+): void {
+  const fields = extractFieldsFromError(err);
+  if (fields !== undefined) {
+    applyActionErrorsToForm(setError, fields);
+  } else {
+    throw err;
+  }
 }
