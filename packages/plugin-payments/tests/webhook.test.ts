@@ -385,6 +385,52 @@ describe("processWebhook (P#6 T2.1 + T2.2 + T2.3 integration)", () => {
     spy.mockRestore();
   });
 
+  // F-dom-pay-5 — a release() failure whose error carries a credential must be
+  // redacted before hitting the server log, mirroring the handler-error path.
+  it("test_release_error_is_redacted_in_log", async () => {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe("sk_test_xxx", { apiVersion: "2023-10-16" });
+    const secret = "whsec_xxx";
+    const payload = JSON.stringify({
+      id: "evt_release_redact",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    });
+    const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
+    const registry = new WebhookRegistry();
+    registry.register(
+      defineStripeWebhook("checkout.session.completed", async () => {
+        throw new Error("handler boom"); // enter the catch → release path
+      }),
+    );
+    // Minimal store: claim is new (true) so the release branch runs; release
+    // throws an error carrying credentials.
+    const leakyStore = {
+      markProcessed: async () => true,
+      release: async () => {
+        throw new Error("release failed whsec_supersecret123 and sk_live_abc999");
+      },
+    } as unknown as Parameters<typeof processWebhook>[0]["store"];
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await processWebhook({
+      stripe,
+      rawBody: payload,
+      signatureHeader: header,
+      webhookSecret: secret,
+      registry,
+      store: leakyStore,
+    });
+    const releaseLogCall = spy.mock.calls.find((c) =>
+      String(c[0]).includes("failed to release idempotency claim"),
+    );
+    expect(releaseLogCall).toBeDefined(); // the release-failure log fired
+    const logged = spy.mock.calls.map((c) => JSON.stringify(c)).join("\n");
+    expect(logged).not.toContain("whsec_supersecret123");
+    expect(logged).not.toContain("sk_live_abc999");
+    expect(logged).toContain("***REDACTED***"); // redaction actually ran
+    spy.mockRestore();
+  });
+
   // T2.2 (#167) — a throwing handler must leave the event UNMARKED so Stripe's
   // retry re-runs it. Before the fix, the event was marked before dispatch, so
   // the retry deduped (duplicate) and the handler never ran again (at-most-once).

@@ -235,9 +235,11 @@ export async function processWebhook(opts: {
     try {
       await opts.store.release(event.id);
     } catch (releaseError) {
+      // #F-dom-pay-5: redact before logging — a release() failure (e.g. a DB
+      // error) may carry credentials, same as the handler-error path below.
       console.error(
         "[plugin-payments] failed to release idempotency claim after handler error:",
-        { eventId: event.id, releaseError },
+        { eventId: event.id, releaseError: redactSecrets(releaseError) },
       );
     }
     // #201: log the FULL error server-side (redacted), expose only a sanitized
