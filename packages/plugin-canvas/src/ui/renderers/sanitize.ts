@@ -53,6 +53,9 @@ const REMOVED_ELEMENT_FLAG: Record<string, keyof SanitizeReport> = {
   iframe: 'removedIframe',
   object: 'removedObject',
   embed: 'removedEmbed',
+  // #F-arch-1: a stripped <meta> (http-equiv=refresh navigation) is a
+  // script-class threat. Inert for SVG (the SVG profile never yields <meta>).
+  meta: 'removedScript',
 }
 
 function classifyRemoved(removed: readonly RemovedEntry[]): SanitizeReport {
@@ -139,16 +142,45 @@ export function sanitizeSvg(input: string): SanitizeResult {
 }
 
 export function sanitizeHtmlSrcdoc(input: string): SanitizeResult {
+  // #F-arch-1/F-sec-1: derive the verdict from DOMPurify's reported removals
+  // (mirroring sanitizeSvg / ADR D2) instead of an input/output regex that
+  // required quoted http-equiv — an unquoted `<meta http-equiv=refresh>`
+  // bypassed it. No hook needed: DOMPurify's built-in HTML attribute policy
+  // strips on*-handlers + javascript:/data: URLs, captured via DOMPurify.removed.
+  //
+  // WHOLE_DOCUMENT: true is required AND more faithful — a browser parses an
+  // iframe `srcdoc` as a complete document, hoisting <meta> into <head> where a
+  // refresh actually fires. The body-fragment parser silently drops <meta>
+  // BEFORE recording it in DOMPurify.removed, so the verdict would miss it.
+  // Full-document parsing keeps <meta> in the tree long enough for FORBID_TAGS
+  // to record the removal; the wrapped <html><head><body> output renders
+  // identically in srcdoc (the browser auto-wraps body fragments regardless).
   const output = DOMPurify.sanitize(input, {
-    FORBID_TAGS: ['meta'],
+    WHOLE_DOCUMENT: true,
+    FORBID_TAGS: ['meta', 'script', 'iframe', 'object', 'embed'],
+    FORBID_ATTR: ['formaction'],
     ALLOW_DATA_ATTR: false,
+    ALLOW_UNKNOWN_PROTOCOLS: false,
   })
-
-  const report = createEmptyReport()
-  if (/<meta[^>]*http-equiv\s*=\s*['"]refresh/i.test(input) &&
-    !/<meta[^>]*http-equiv\s*=\s*['"]refresh/i.test(output)) {
-    report.removedScript = true
+  // Snapshot immediately — DOMPurify.removed is overwritten on the next call.
+  const removed = [...(DOMPurify.removed as unknown as RemovedEntry[])]
+  const full = classifyRemoved(removed)
+  // enforceArtifactSecurity checks `report.removedScript` for the html kind, so
+  // fold every dangerous-removal signal into it — this keeps the verdict
+  // actionable for ALL vectors (meta-refresh, iframe, embed, object, on-handler,
+  // js:/data: URLs) without touching schema.ts. Individual flags stay populated.
+  return {
+    output,
+    report: {
+      ...full,
+      removedScript:
+        full.removedScript ||
+        full.removedIframe ||
+        full.removedObject ||
+        full.removedEmbed ||
+        full.removedOnHandler ||
+        full.removedJsUrl ||
+        full.removedDataUrl,
+    },
   }
-
-  return { output, report }
 }

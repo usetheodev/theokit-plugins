@@ -135,4 +135,41 @@ describe('sanitizeHtmlSrcdoc', () => {
     const { output } = sanitizeHtmlSrcdoc('<p>hi</p>')
     expect(output).toContain('<p>hi</p>')
   })
+
+  // #F-arch-1/F-sec-1: verdict must come from DOMPurify removals, not a regex
+  // that requires quoted http-equiv (unquoted meta-refresh bypassed it).
+  it('test_unquoted_meta_refresh_srcdoc_is_flagged (#F-arch-1)', () => {
+    const { output, report } = sanitizeHtmlSrcdoc(
+      '<meta http-equiv=refresh content=0><p>hi</p>',
+    )
+    expect(report.removedScript).toBe(true) // dangerous removal → enforceArtifactSecurity throws
+    expect(output).not.toMatch(/<meta/i)
+  })
+
+  it('test_iframe_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<iframe src="https://evil.test"></iframe><p>ok</p>')
+    expect(report.removedScript).toBe(true)
+  })
+
+  it('test_on_handler_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<p onclick="evil()">x</p>')
+    expect(report.removedScript).toBe(true)
+  })
+
+  it('clean HTML is not flagged (no false positive)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<p>hello <strong>world</strong></p>')
+    expect(report.removedScript).toBe(false)
+    expect(report.removedIframe).toBe(false)
+  })
+
+  it('test_script_tag_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { output, report } = sanitizeHtmlSrcdoc('<script>alert(1)</script><p>ok</p>')
+    expect(report.removedScript).toBe(true)
+    expect(output).not.toMatch(/<script/i)
+  })
+
+  it('test_javascript_url_srcdoc_is_flagged (#F-sec-1)', () => {
+    const { report } = sanitizeHtmlSrcdoc('<a href="javascript:evil()">x</a>')
+    expect(report.removedScript).toBe(true)
+  })
 })
