@@ -96,89 +96,11 @@ export function github(opts: GitHubProviderOptions): AuthProvider<GitHubProfile,
         );
       }
 
-      // Token exchange — GitHub accepts form-encoded body; request JSON response
-      const tokenBody = new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: opts.redirectUri,
-        client_id: opts.clientId,
-        client_secret: opts.clientSecret,
-      });
-      const tokenRes = await fetch(tokenEndpoint, {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        body: tokenBody.toString(),
-      });
-      if (!tokenRes.ok) {
-        throw new GitHubAuthError(
-          "token_exchange_failed",
-          `GitHub token exchange failed: HTTP ${tokenRes.status}`,
-        );
-      }
-      const tokens = (await tokenRes.json()) as TokenResponse;
-      if (!tokens.access_token) {
-        throw new GitHubAuthError(
-          "missing_access_token",
-          "GitHub token response did not include access_token",
-        );
-      }
-
-      // Userinfo fetch — note `Authorization: token X` (NOT Bearer) per GitHub REST API
-      const userRes = await fetch(userinfoEndpoint, {
-        headers: {
-          authorization: `token ${tokens.access_token}`,
-          accept: "application/vnd.github+json",
-        },
-      });
-      if (!userRes.ok) {
-        throw new GitHubAuthError(
-          "userinfo_fetch_failed",
-          `GitHub userinfo fetch failed: HTTP ${userRes.status}`,
-        );
-      }
-      const raw = (await userRes.json()) as Partial<GitHubProfile>;
-      if (typeof raw.id !== "number") {
-        throw new GitHubAuthError(
-          "missing_id",
-          "GitHub userinfo response missing numeric id field",
-        );
-      }
-      if (!raw.login) {
-        throw new GitHubAuthError(
-          "missing_login",
-          "GitHub userinfo response missing login field",
-        );
-      }
-
-      // Conditional email fetch when scope grants user:email AND /user.email is null
-      let email = raw.email ?? null;
-      if (wantsEmail && !email) {
-        const emailsRes = await fetch(emailsEndpoint, {
-          headers: {
-            authorization: `token ${tokens.access_token}`,
-            accept: "application/vnd.github+json",
-          },
-        });
-        // #203 (Rule 8 — fail loud): the user explicitly granted user:email and
-        // /user returned no email, so a failed /user/emails fetch is NOT benign —
-        // silently returning a null-email identity yields a broken account. Surface
-        // it as a typed error and let the caller decide (retry, degrade, abort).
-        if (!emailsRes.ok) {
-          throw new GitHubAuthError(
-            "emails_fetch_failed",
-            `GitHub /user/emails fetch failed: HTTP ${emailsRes.status} ` +
-              "(user:email scope was granted; refusing to return a null-email identity)",
-          );
-        }
-        const entries = (await emailsRes.json()) as EmailEntry[];
-        const primary = entries.find((e) => e.primary && e.verified);
-        // email may still be null here when the user has NO verified email — that
-        // is a legitimate, documented outcome, distinct from the fetch failure above.
-        email = primary?.email ?? entries.find((e) => e.verified)?.email ?? null;
-      }
+      // #183: behavior-preserving extraction into named helpers keeps this
+      // method's cyclomatic complexity low. Each helper owns one fetch + its guards.
+      const accessToken = await githubExchangeToken(code, opts, tokenEndpoint);
+      const raw = await githubFetchUser(accessToken, userinfoEndpoint);
+      const email = await githubResolveEmail(raw, wantsEmail, accessToken, emailsEndpoint);
 
       const profile: GitHubProfile = {
         id: raw.id,
@@ -191,10 +113,98 @@ export function github(opts: GitHubProviderOptions): AuthProvider<GitHubProfile,
       return {
         profile,
         providerName: "github",
-        rawTokens: {
-          accessToken: tokens.access_token,
-        },
+        rawTokens: { accessToken },
       };
     },
   };
+}
+
+/** Exchange the OAuth code for an access token (throws on failure). */
+async function githubExchangeToken(
+  code: string,
+  opts: GitHubProviderOptions,
+  tokenEndpoint: string,
+): Promise<string> {
+  const tokenBody = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: opts.redirectUri,
+    client_id: opts.clientId,
+    client_secret: opts.clientSecret,
+  });
+  const tokenRes = await fetch(tokenEndpoint, {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
+    body: tokenBody.toString(),
+  });
+  if (!tokenRes.ok) {
+    throw new GitHubAuthError(
+      "token_exchange_failed",
+      `GitHub token exchange failed: HTTP ${tokenRes.status}`,
+    );
+  }
+  const tokens = (await tokenRes.json()) as TokenResponse;
+  if (!tokens.access_token) {
+    throw new GitHubAuthError(
+      "missing_access_token",
+      "GitHub token response did not include access_token",
+    );
+  }
+  return tokens.access_token;
+}
+
+/** Fetch the GitHub user profile (note `Authorization: token X`). Throws on failure. */
+async function githubFetchUser(
+  accessToken: string,
+  userinfoEndpoint: string,
+): Promise<Partial<GitHubProfile> & { id: number; login: string }> {
+  const userRes = await fetch(userinfoEndpoint, {
+    headers: { authorization: `token ${accessToken}`, accept: "application/vnd.github+json" },
+  });
+  if (!userRes.ok) {
+    throw new GitHubAuthError(
+      "userinfo_fetch_failed",
+      `GitHub userinfo fetch failed: HTTP ${userRes.status}`,
+    );
+  }
+  const raw = (await userRes.json()) as Partial<GitHubProfile>;
+  if (typeof raw.id !== "number") {
+    throw new GitHubAuthError("missing_id", "GitHub userinfo response missing numeric id field");
+  }
+  if (!raw.login) {
+    throw new GitHubAuthError("missing_login", "GitHub userinfo response missing login field");
+  }
+  return raw as Partial<GitHubProfile> & { id: number; login: string };
+}
+
+/**
+ * Resolve the email: `/user.email` when present; otherwise (when `user:email`
+ * scope was granted) the primary/first verified email from `/user/emails`.
+ * #203: a failed `/user/emails` fetch fails loud instead of yielding a null email.
+ */
+async function githubResolveEmail(
+  raw: Partial<GitHubProfile>,
+  wantsEmail: boolean,
+  accessToken: string,
+  emailsEndpoint: string,
+): Promise<string | null> {
+  let email = raw.email ?? null;
+  if (wantsEmail && !email) {
+    const emailsRes = await fetch(emailsEndpoint, {
+      headers: { authorization: `token ${accessToken}`, accept: "application/vnd.github+json" },
+    });
+    if (!emailsRes.ok) {
+      throw new GitHubAuthError(
+        "emails_fetch_failed",
+        `GitHub /user/emails fetch failed: HTTP ${emailsRes.status} ` +
+          "(user:email scope was granted; refusing to return a null-email identity)",
+      );
+    }
+    const entries = (await emailsRes.json()) as EmailEntry[];
+    const primary = entries.find((e) => e.primary && e.verified);
+    // email may still be null here when the user has NO verified email — a
+    // legitimate, documented outcome, distinct from the fetch failure above.
+    email = primary?.email ?? entries.find((e) => e.verified)?.email ?? null;
+  }
+  return email;
 }

@@ -51,6 +51,78 @@ interface InternalRoomState {
   connectionId: string | null;
 }
 
+/** #185: a single inbound realtime frame (presence/broadcast wire shape). */
+interface RealtimeOutFrame {
+  type: string;
+  connectionId?: string;
+  presence?: Presence;
+  event?: string;
+  payload?: BroadcastPayload;
+}
+
+type SetStateAndNotify = (next: InternalRoomState) => void;
+
+/** #185: reduce one inbound frame into room state (extracted to cap effect CC). */
+function applyRealtimeFrame(
+  out: RealtimeOutFrame,
+  stateRef: { current: InternalRoomState },
+  setStateAndNotify: SetStateAndNotify,
+): void {
+  switch (out.type) {
+    case "joined":
+      applyJoinedFrame(out, stateRef, setStateAndNotify);
+      break;
+    case "left":
+      if (out.connectionId !== undefined) {
+        const { [out.connectionId]: _removed, ...rest } = stateRef.current.others;
+        setStateAndNotify({ ...stateRef.current, others: rest });
+      }
+      break;
+    case "presence-changed":
+      applyPresenceChangedFrame(out, stateRef, setStateAndNotify);
+      break;
+    case "broadcast":
+      // Broadcast events surface via useBroadcast subscription, not state.
+      break;
+  }
+}
+
+function applyJoinedFrame(
+  out: RealtimeOutFrame,
+  stateRef: { current: InternalRoomState },
+  setStateAndNotify: SetStateAndNotify,
+): void {
+  const isSelf = stateRef.current.connectionId === null;
+  if (isSelf && out.connectionId !== undefined) {
+    setStateAndNotify({
+      others: { ...stateRef.current.others },
+      myPresence: out.presence ?? stateRef.current.myPresence,
+      connectionId: out.connectionId,
+    });
+  } else if (out.connectionId !== undefined) {
+    setStateAndNotify({
+      ...stateRef.current,
+      others: { ...stateRef.current.others, [out.connectionId]: out.presence ?? {} },
+    });
+  }
+}
+
+function applyPresenceChangedFrame(
+  out: RealtimeOutFrame,
+  stateRef: { current: InternalRoomState },
+  setStateAndNotify: SetStateAndNotify,
+): void {
+  if (out.connectionId === undefined || out.presence === undefined) return;
+  if (out.connectionId === stateRef.current.connectionId) {
+    setStateAndNotify({ ...stateRef.current, myPresence: out.presence });
+  } else {
+    setStateAndNotify({
+      ...stateRef.current,
+      others: { ...stateRef.current.others, [out.connectionId]: out.presence },
+    });
+  }
+}
+
 interface RoomContextValue {
   state: InternalRoomState;
   emit(out: { kind: "presence-update"; patch: Partial<Presence> }): void;
@@ -130,49 +202,9 @@ export function RoomProvider(props: RoomProviderProps): React.ReactElement {
         >(name, { initialPresence: stateRef.current.myPresence }, { baseUrl: url, transport: "auto" });
         for await (const out of iter) {
           if (cancelled) return;
-          switch (out.type) {
-            case "joined": {
-              const isSelf = stateRef.current.connectionId === null;
-              if (isSelf && out.connectionId !== undefined) {
-                setStateAndNotify({
-                  others: { ...stateRef.current.others },
-                  myPresence: out.presence ?? stateRef.current.myPresence,
-                  connectionId: out.connectionId,
-                });
-              } else if (out.connectionId !== undefined) {
-                setStateAndNotify({
-                  ...stateRef.current,
-                  others: {
-                    ...stateRef.current.others,
-                    [out.connectionId]: out.presence ?? {},
-                  },
-                });
-              }
-              break;
-            }
-            case "left": {
-              if (out.connectionId !== undefined) {
-                const { [out.connectionId]: _removed, ...rest } = stateRef.current.others;
-                setStateAndNotify({ ...stateRef.current, others: rest });
-              }
-              break;
-            }
-            case "presence-changed": {
-              if (out.connectionId === undefined || out.presence === undefined) break;
-              if (out.connectionId === stateRef.current.connectionId) {
-                setStateAndNotify({ ...stateRef.current, myPresence: out.presence });
-              } else {
-                setStateAndNotify({
-                  ...stateRef.current,
-                  others: { ...stateRef.current.others, [out.connectionId]: out.presence },
-                });
-              }
-              break;
-            }
-            case "broadcast":
-              // Broadcast events surface via useBroadcast subscription, not state.
-              break;
-          }
+          // #185: per-frame state reduction extracted to keep this effect's
+          // cyclomatic complexity low (behavior unchanged).
+          applyRealtimeFrame(out, stateRef, setStateAndNotify);
         }
       } catch {
         // Subscription failure — leave state intact; consumer can retry by

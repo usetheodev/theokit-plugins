@@ -113,9 +113,7 @@ export function serializeArtifactForCopy(artifact: Artifact): string {
     case 'whiteboard-scene':
       return JSON.stringify(artifact.scene, null, 2)
     case 'slide-deck':
-      return typeof artifact.source === 'string'
-        ? artifact.source
-        : JSON.stringify(artifact.source, null, 2)
+      return slideDeckSource(artifact)
     case 'image':
       return artifact.source === 'data' ? artifact.dataUrl : artifact.url
     case 'diff':
@@ -127,20 +125,22 @@ export function serializeArtifactForCopy(artifact: Artifact): string {
   }
 }
 
+/** #187: slide-deck source — raw string, or pretty-printed JSON when structured. */
+function slideDeckSource(artifact: Extract<Artifact, { kind: 'slide-deck' }>): string {
+  return typeof artifact.source === 'string'
+    ? artifact.source
+    : JSON.stringify(artifact.source, null, 2)
+}
+
+/** #187: unified-diff line prefix per line kind (lookup, not a ternary chain). */
+const DIFF_LINE_PREFIX: Record<string, string> = { added: '+', removed: '-', meta: '@' }
+
 function formatDiffArtifact(artifact: Extract<Artifact, { kind: 'diff' }>): string {
   const lines: string[] = [`--- ${artifact.path}`, `+++ ${artifact.path}`]
   for (const hunk of artifact.hunks) {
     if (hunk.header !== undefined && hunk.header.length > 0) lines.push(hunk.header)
     for (const line of hunk.lines) {
-      const prefix =
-        line.kind === 'added'
-          ? '+'
-          : line.kind === 'removed'
-            ? '-'
-            : line.kind === 'meta'
-              ? '@'
-              : ' '
-      lines.push(`${prefix}${line.content}`)
+      lines.push(`${DIFF_LINE_PREFIX[line.kind] ?? ' '}${line.content}`)
     }
   }
   return lines.join('\n')

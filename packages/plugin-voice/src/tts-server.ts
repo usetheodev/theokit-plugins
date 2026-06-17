@@ -70,42 +70,14 @@ export async function handleTtsRequest(
   config: VoiceConfig['tts'],
   opts: TtsHandlerOptions = {},
 ): Promise<Response> {
+  // #182/#189: behavior-preserving extraction into named helpers to keep this
+  // orchestrator's cyclomatic complexity low.
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch
 
-  if (typeof input?.text !== 'string' || input.text.length === 0) {
-    return jsonError(400, 'INVALID_BODY', '"text" is required and must be a non-empty string.')
-  }
-  if (input.text.length > MAX_TEXT_CHARS) {
-    return jsonError(
-      400,
-      'INPUT_TOO_LONG',
-      `"text" exceeds the ${MAX_TEXT_CHARS}-character limit imposed by OpenAI tts-1. Split the input client-side.`,
-    )
-  }
+  const validated = validateTtsInput(input, config)
+  if (validated instanceof Response) return validated
+  const { voice } = validated
 
-  const voice = input.voice ?? config.voice
-  if (!VOICE_SET.has(voice)) {
-    return jsonError(
-      400,
-      'INVALID_VOICE',
-      `"${voice}" is not an OpenAI tts-1 voice. Allowed: ${[...VALID_VOICES].sort().join(', ')}.`,
-    )
-  }
-
-  if (input.speed !== undefined) {
-    if (typeof input.speed !== 'number' || !Number.isFinite(input.speed)) {
-      return jsonError(400, 'INVALID_SPEED', '"speed" must be a finite number.')
-    }
-    if (input.speed < 0.25 || input.speed > 4.0) {
-      return jsonError(
-        400,
-        'INVALID_SPEED',
-        `"speed" ${input.speed} is outside the OpenAI tts-1 range [0.25, 4.0].`,
-      )
-    }
-  }
-
-  const url = PROVIDER_URL[config.provider]
   const upstreamPayload: Record<string, unknown> = {
     model: config.model,
     voice,
@@ -116,54 +88,22 @@ export async function handleTtsRequest(
     upstreamPayload.speed = input.speed
   }
 
-  // #212: bound the upstream call. Compose the per-request timeout with the
-  // caller's abort signal so either trigger aborts the fetch; passing it to the
-  // real fetch also cancels the streamed body when the client aborts mid-stream.
-  const timeoutSignal = AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-  const signal =
-    opts.signal !== undefined ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal
   let upstream: Response
   try {
-    upstream = await fetchImpl(url, {
+    upstream = await fetchImpl(PROVIDER_URL[config.provider], {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(upstreamPayload),
-      signal,
+      signal: composeUpstreamSignal(opts),
     })
   } catch (err) {
-    // #212: timeout or client abort → 504; genuine network errors stay 502.
-    if (isAbortLike(err)) {
-      return jsonError(
-        504,
-        'UPSTREAM_TIMEOUT',
-        `Upstream ${config.provider} TTS did not respond within the timeout.`,
-      )
-    }
-    const wrapped = new VoicePluginError(
-      `Network failure calling ${config.provider} TTS: ${err instanceof Error ? err.message : 'unknown'}`,
-      { cause: err },
-    )
-    return jsonError(502, 'UPSTREAM_NETWORK', wrapped.message)
+    return mapTtsFetchError(err, config.provider)
   }
 
-  if (!upstream.ok) {
-    const text = await upstream.text().catch(() => '')
-    // #214: do not reflect the raw upstream body — log it server-side under a
-    // correlation id and return a generic message with the same id.
-    const correlationId = randomUUID()
-    console.error(
-      `[voice:tts] upstream ${config.provider} returned ${upstream.status} [ref ${correlationId}]: ${truncate(text, 500)}`,
-    )
-    return jsonError(
-      upstream.status >= 500 ? 502 : upstream.status,
-      'UPSTREAM_ERROR',
-      `Upstream ${config.provider} returned an error (status ${upstream.status}). Reference: ${correlationId}`,
-    )
-  }
-
+  if (!upstream.ok) return rejectTtsUpstream(upstream, config.provider)
   if (upstream.body === null) {
     return jsonError(502, 'UPSTREAM_EMPTY', `${config.provider} returned an empty audio body.`)
   }
@@ -177,10 +117,90 @@ export async function handleTtsRequest(
   }
   if (input.speed !== undefined) responseHeaders['X-Voice-Speed'] = String(input.speed)
 
-  return new Response(upstream.body, {
-    status: 200,
-    headers: responseHeaders,
-  })
+  return new Response(upstream.body, { status: 200, headers: responseHeaders })
+}
+
+/** Validate text/voice/speed and resolve the voice, or return a 400 Response. */
+function validateTtsInput(
+  input: TtsInput,
+  config: VoiceConfig['tts'],
+): { voice: string } | Response {
+  if (typeof input?.text !== 'string' || input.text.length === 0) {
+    return jsonError(400, 'INVALID_BODY', '"text" is required and must be a non-empty string.')
+  }
+  if (input.text.length > MAX_TEXT_CHARS) {
+    return jsonError(
+      400,
+      'INPUT_TOO_LONG',
+      `"text" exceeds the ${MAX_TEXT_CHARS}-character limit imposed by OpenAI tts-1. Split the input client-side.`,
+    )
+  }
+  const voice = input.voice ?? config.voice
+  if (!VOICE_SET.has(voice)) {
+    return jsonError(
+      400,
+      'INVALID_VOICE',
+      `"${voice}" is not an OpenAI tts-1 voice. Allowed: ${[...VALID_VOICES].sort().join(', ')}.`,
+    )
+  }
+  const speedError = validateTtsSpeed(input.speed)
+  if (speedError !== undefined) return speedError
+  return { voice }
+}
+
+/** Validate the optional playback speed; returns a 400 Response or undefined. */
+function validateTtsSpeed(speed: number | undefined): Response | undefined {
+  if (speed === undefined) return undefined
+  if (typeof speed !== 'number' || !Number.isFinite(speed)) {
+    return jsonError(400, 'INVALID_SPEED', '"speed" must be a finite number.')
+  }
+  if (speed < 0.25 || speed > 4.0) {
+    return jsonError(
+      400,
+      'INVALID_SPEED',
+      `"speed" ${speed} is outside the OpenAI tts-1 range [0.25, 4.0].`,
+    )
+  }
+  return undefined
+}
+
+/** #212: compose the per-request timeout with the caller's abort signal. */
+function composeUpstreamSignal(opts: { timeoutMs?: number; signal?: AbortSignal }): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  return opts.signal !== undefined ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal
+}
+
+/** #212: map an upstream fetch rejection to 504 (abort/timeout) or 502 (network). */
+function mapTtsFetchError(err: unknown, provider: VoiceConfig['tts']['provider']): Response {
+  if (isAbortLike(err)) {
+    return jsonError(
+      504,
+      'UPSTREAM_TIMEOUT',
+      `Upstream ${provider} TTS did not respond within the timeout.`,
+    )
+  }
+  const wrapped = new VoicePluginError(
+    `Network failure calling ${provider} TTS: ${err instanceof Error ? err.message : 'unknown'}`,
+    { cause: err },
+  )
+  return jsonError(502, 'UPSTREAM_NETWORK', wrapped.message)
+}
+
+/** #214: log the raw upstream body server-side; return a generic client error. */
+async function rejectTtsUpstream(
+  upstream: Response,
+  provider: VoiceConfig['tts']['provider'],
+): Promise<Response> {
+  const text = await upstream.text().catch(() => '')
+  const correlationId = randomUUID()
+  console.error(
+    `[voice:tts] upstream ${provider} returned ${upstream.status} [ref ${correlationId}]: ${truncate(text, 500)}`,
+  )
+  return jsonError(
+    upstream.status >= 500 ? 502 : upstream.status,
+    'UPSTREAM_ERROR',
+    `Upstream ${provider} returned an error (status ${upstream.status}). Reference: ${correlationId}`,
+  )
 }
 
 function jsonError(status: number, code: string, message: string): Response {

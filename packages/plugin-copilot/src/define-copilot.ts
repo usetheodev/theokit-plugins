@@ -71,7 +71,8 @@ const COPILOT_ID_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
  *
  * @public
  */
-export function defineCopilot(opts: DefineCopilotOptions): CopilotDescriptor {
+/** #184: validate object shape, id, and room (throws CopilotConfigError). */
+function assertCopilotBaseShape(opts: DefineCopilotOptions): void {
   if (opts === null || typeof opts !== "object") {
     throw new CopilotConfigError("defineCopilot: options object is required");
   }
@@ -82,10 +83,15 @@ export function defineCopilot(opts: DefineCopilotOptions): CopilotDescriptor {
     );
   }
   if (opts.room === undefined || typeof opts.room.id !== "string" || opts.room.id.length === 0) {
-    throw new CopilotConfigError("defineCopilot: opts.room must be a RoomDescriptor with non-empty id", {
-      code: "copilot_room_invalid",
-    });
+    throw new CopilotConfigError(
+      "defineCopilot: opts.room must be a RoomDescriptor with non-empty id",
+      { code: "copilot_room_invalid" },
+    );
   }
+}
+
+/** #184: validate agent + identity (throws CopilotConfigError). */
+function assertCopilotAgentIdentity(opts: DefineCopilotOptions): void {
   if (opts.agent === undefined || typeof opts.agent.name !== "string" || opts.agent.name.length === 0) {
     throw new CopilotConfigError("defineCopilot: opts.agent.name must be non-empty string", {
       code: "copilot_agent_invalid",
@@ -96,18 +102,26 @@ export function defineCopilot(opts: DefineCopilotOptions): CopilotDescriptor {
       code: "copilot_agent_model_missing",
     });
   }
-  if (opts.identity === undefined || typeof opts.identity.name !== "string" || opts.identity.name.length === 0) {
+  if (
+    opts.identity === undefined ||
+    typeof opts.identity.name !== "string" ||
+    opts.identity.name.length === 0
+  ) {
     throw new CopilotConfigError("defineCopilot: opts.identity.name must be non-empty string", {
       code: "copilot_identity_invalid",
     });
   }
-  if (!Array.isArray(opts.triggers) || opts.triggers.length === 0) {
+}
+
+/** #184: validate the triggers array + per-trigger requirements. */
+function assertCopilotTriggers(triggers: DefineCopilotOptions["triggers"]): void {
+  if (!Array.isArray(triggers) || triggers.length === 0) {
     throw new CopilotConfigError(
       "defineCopilot: opts.triggers must be a non-empty array (at least one trigger required to activate copilot)",
       { code: "copilot_triggers_empty" },
     );
   }
-  for (const t of opts.triggers) {
+  for (const t of triggers) {
     if (t.on === "custom" && typeof t.filter !== "function") {
       throw new CopilotConfigError(
         "defineCopilot: custom trigger must include a filter function",
@@ -121,6 +135,14 @@ export function defineCopilot(opts: DefineCopilotOptions): CopilotDescriptor {
       );
     }
   }
+}
+
+export function defineCopilot(opts: DefineCopilotOptions): CopilotDescriptor {
+  // #184: validation split into focused asserts to keep this factory's
+  // cyclomatic complexity low (behavior unchanged — same checks, same codes).
+  assertCopilotBaseShape(opts);
+  assertCopilotAgentIdentity(opts);
+  assertCopilotTriggers(opts.triggers);
   return {
     id: opts.id,
     room: opts.room,

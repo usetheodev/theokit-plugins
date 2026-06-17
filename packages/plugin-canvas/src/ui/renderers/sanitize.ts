@@ -47,25 +47,40 @@ interface RemovedEntry {
  * the security verdict the boundary relies on is exact, not inferred. The parser
  * wrapper element (`BODY`) is filtered out; node names are case-normalised.
  */
+/** #186: element nodeName → the SanitizeReport flag it sets (lookup, not if-chain). */
+const REMOVED_ELEMENT_FLAG: Record<string, keyof SanitizeReport> = {
+  script: 'removedScript',
+  iframe: 'removedIframe',
+  object: 'removedObject',
+  embed: 'removedEmbed',
+}
+
 function classifyRemoved(removed: readonly RemovedEntry[]): SanitizeReport {
   const report = createEmptyReport()
   for (const entry of removed) {
-    if (entry.element) {
-      const name = String(entry.element.nodeName ?? '').toLowerCase()
-      if (name === 'script') report.removedScript = true
-      else if (name === 'iframe') report.removedIframe = true
-      else if (name === 'object') report.removedObject = true
-      else if (name === 'embed') report.removedEmbed = true
-    } else if (entry.attribute) {
-      const attrName = String(entry.attribute.name ?? '').toLowerCase()
-      const attrValue = String(entry.attribute.value ?? '')
-      if (/^on/i.test(attrName)) report.removedOnHandler = true
-      if (/^\s*javascript:/i.test(attrValue)) report.removedJsUrl = true
-      if (/^\s*data:(?:text\/html|application\/javascript)/i.test(attrValue))
-        report.removedDataUrl = true
-    }
+    if (entry.element) classifyRemovedElement(report, entry.element)
+    else if (entry.attribute) classifyRemovedAttribute(report, entry.attribute)
   }
   return report
+}
+
+function classifyRemovedElement(report: SanitizeReport, element: { nodeName?: string }): void {
+  const name = String(element.nodeName ?? '').toLowerCase()
+  const flag = REMOVED_ELEMENT_FLAG[name]
+  if (flag !== undefined) report[flag] = true
+}
+
+function classifyRemovedAttribute(
+  report: SanitizeReport,
+  attribute: { name?: string; value?: string },
+): void {
+  const attrName = String(attribute.name ?? '').toLowerCase()
+  const attrValue = String(attribute.value ?? '')
+  if (/^on/i.test(attrName)) report.removedOnHandler = true
+  if (/^\s*javascript:/i.test(attrValue)) report.removedJsUrl = true
+  if (/^\s*data:(?:text\/html|application\/javascript)/i.test(attrValue)) {
+    report.removedDataUrl = true
+  }
 }
 
 /**

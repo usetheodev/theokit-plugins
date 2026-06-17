@@ -47,77 +47,108 @@ export interface ArtifactStore {
 // ───── In-memory ─────
 
 export function createInMemoryArtifactStore(): ArtifactStore {
-  const byId = new Map<string, Artifact[]>() // id → ordered ascending by version
-
-  const sortAsc = (a: Artifact, b: Artifact) => a.version - b.version
-
+  // #182: thin delegating factory; each operation lives in a named helper to
+  // keep cyclomatic complexity low (behavior unchanged). `byId` is id → versions
+  // ordered ascending by version.
+  const byId = new Map<string, Artifact[]>()
   return {
     async insert(artifact) {
-      const validation = validateArtifact(artifact)
-      if (!validation.ok) throw validation.error
-      const existing = byId.get(artifact.id) ?? []
-      if (existing.some((a) => a.version === artifact.version)) {
-        throw new CanvasPluginError(
-          `Artifact "${artifact.id}" already has a version ${artifact.version}.`,
-        )
-      }
-      const next = [...existing, validation.artifact].sort(sortAsc)
-      byId.set(artifact.id, next)
-      return validation.artifact
+      return memInsert(byId, artifact)
     },
     async get(id, version) {
-      const versions = byId.get(id)
-      if (versions === undefined || versions.length === 0) return null
-      if (version === undefined) return versions[versions.length - 1] ?? null
-      return versions.find((a) => a.version === version) ?? null
+      return memGet(byId, id, version)
     },
     async getVersions(id) {
       return byId.get(id)?.slice() ?? []
     },
     async list(filter = {}) {
-      const mode = filter.mode ?? 'latest'
-      const offset = filter.offset ?? 0
-      const limit = filter.limit ?? 200
-      const rows: Artifact[] = []
-      for (const versions of byId.values()) {
-        const candidates = mode === 'latest' ? [versions[versions.length - 1]] : versions
-        for (const a of candidates) {
-          if (a === undefined) continue
-          if (filter.sessionId !== undefined && a.sessionId !== filter.sessionId) continue
-          if (filter.kind !== undefined && a.kind !== filter.kind) continue
-          rows.push(a)
-        }
-      }
-      rows.sort((a, b) => {
-        const ay = typeof a.createdAt === 'string' ? Date.parse(a.createdAt) : a.createdAt
-        const by = typeof b.createdAt === 'string' ? Date.parse(b.createdAt) : b.createdAt
-        return by - ay
-      })
-      return rows.slice(offset, offset + limit)
+      return memList(byId, filter)
     },
     async nextVersion(id) {
-      const versions = byId.get(id)
-      if (versions === undefined || versions.length === 0) return 1
-      return (versions[versions.length - 1]?.version ?? 0) + 1
+      return memNextVersion(byId, id)
     },
     async delete(id, version) {
-      const versions = byId.get(id)
-      if (versions === undefined) {
-        if (version === undefined) return
-        throw new CanvasArtifactNotFoundError(id)
-      }
-      if (version === undefined) {
-        byId.delete(id)
-        return
-      }
-      const next = versions.filter((a) => a.version !== version)
-      if (next.length === versions.length) {
-        throw new CanvasArtifactNotFoundError(`${id}@v${version}`)
-      }
-      if (next.length === 0) byId.delete(id)
-      else byId.set(id, next)
+      memDelete(byId, id, version)
     },
   }
+}
+
+function memInsert(byId: Map<string, Artifact[]>, artifact: Artifact): Artifact {
+  const validation = validateArtifact(artifact)
+  if (!validation.ok) throw validation.error
+  const existing = byId.get(artifact.id) ?? []
+  if (existing.some((a) => a.version === artifact.version)) {
+    throw new CanvasPluginError(
+      `Artifact "${artifact.id}" already has a version ${artifact.version}.`,
+    )
+  }
+  const next = [...existing, validation.artifact].sort((a, b) => a.version - b.version)
+  byId.set(artifact.id, next)
+  return validation.artifact
+}
+
+function memGet(
+  byId: Map<string, Artifact[]>,
+  id: string,
+  version: number | undefined,
+): Artifact | null {
+  const versions = byId.get(id)
+  if (versions === undefined || versions.length === 0) return null
+  if (version === undefined) return versions[versions.length - 1] ?? null
+  return versions.find((a) => a.version === version) ?? null
+}
+
+function memMatchesFilter(a: Artifact, filter: ArtifactListFilter): boolean {
+  if (filter.sessionId !== undefined && a.sessionId !== filter.sessionId) return false
+  if (filter.kind !== undefined && a.kind !== filter.kind) return false
+  return true
+}
+
+function memList(byId: Map<string, Artifact[]>, filter: ArtifactListFilter): Artifact[] {
+  const mode = filter.mode ?? 'latest'
+  const offset = filter.offset ?? 0
+  const limit = filter.limit ?? 200
+  const rows: Artifact[] = []
+  for (const versions of byId.values()) {
+    const candidates = mode === 'latest' ? [versions[versions.length - 1]] : versions
+    for (const a of candidates) {
+      if (a !== undefined && memMatchesFilter(a, filter)) rows.push(a)
+    }
+  }
+  rows.sort((a, b) => {
+    const ay = typeof a.createdAt === 'string' ? Date.parse(a.createdAt) : a.createdAt
+    const by = typeof b.createdAt === 'string' ? Date.parse(b.createdAt) : b.createdAt
+    return by - ay
+  })
+  return rows.slice(offset, offset + limit)
+}
+
+function memNextVersion(byId: Map<string, Artifact[]>, id: string): number {
+  const versions = byId.get(id)
+  if (versions === undefined || versions.length === 0) return 1
+  return (versions[versions.length - 1]?.version ?? 0) + 1
+}
+
+function memDelete(
+  byId: Map<string, Artifact[]>,
+  id: string,
+  version: number | undefined,
+): void {
+  const versions = byId.get(id)
+  if (versions === undefined) {
+    if (version === undefined) return
+    throw new CanvasArtifactNotFoundError(id)
+  }
+  if (version === undefined) {
+    byId.delete(id)
+    return
+  }
+  const next = versions.filter((a) => a.version !== version)
+  if (next.length === versions.length) {
+    throw new CanvasArtifactNotFoundError(`${id}@v${version}`)
+  }
+  if (next.length === 0) byId.delete(id)
+  else byId.set(id, next)
 }
 
 // ───── SQLite adapter ─────
