@@ -324,6 +324,40 @@ describe("#192 — OIDC base-URL SSRF hardening", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("test_0_0_0_0_endpoint_rejected", async () => {
+    // F-sec-3: 0.0.0.0 is the wildcard/INADDR_ANY bind address, NOT a loopback
+    // destination. A poisoned discovery doc pointing token_endpoint at
+    // http://0.0.0.0:PORT must be rejected as plaintext, not exempted.
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        ...DISCOVERY_DOC,
+        token_endpoint: "http://0.0.0.0:8080/token",
+      }),
+    );
+    const provider = google(OPTS);
+    await expect(
+      provider.handleCallback(mockReq(`?code=c&state=${TX.state}`), TX),
+    ).rejects.toMatchObject({ code: "insecure_oidc_url" });
+    // client_secret-bearing POST must NOT fire: only discovery (call 1) happened.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("test_0_endpoint_normalized_to_0_0_0_0_rejected", async () => {
+    // URL parsing normalizes http://0/ → hostname "0.0.0.0", so the short form
+    // routes through the same (now-rejected) path. Belt-and-suspenders vector.
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        ...DISCOVERY_DOC,
+        token_endpoint: "http://0:8080/token",
+      }),
+    );
+    const provider = google(OPTS);
+    await expect(
+      provider.handleCallback(mockReq(`?code=c&state=${TX.state}`), TX),
+    ).rejects.toMatchObject({ code: "insecure_oidc_url" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("test_discovered_userinfo_endpoint_must_be_https", async () => {
     fetchSpy
       .mockResolvedValueOnce(

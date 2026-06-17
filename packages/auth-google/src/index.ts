@@ -51,11 +51,15 @@ function isLoopbackHost(hostname: string): boolean {
   // defensiveness. URL parsing already lowercases the host and normalizes
   // decimal/octal/hex IPv4 (e.g. 2130706433, 0x7f.0.0.1) to dotted-quad, so the
   // 127.0.0.0/8 regex catches every loopback IPv4 spelling.
+  // #F-sec-3: "0.0.0.0" (INADDR_ANY) is a wildcard BIND address, not a loopback
+  // DESTINATION — a discovery doc pointing http://0.0.0.0:PORT is a plaintext
+  // exfil vector, not a local mock. It is NOT exempt. (URL parsing normalizes
+  // the short form http://0/ to hostname "0.0.0.0", so that spelling is rejected
+  // by the same omission; IPv6 unspecified "[::]" was never in this set.)
   if (
     hostname === "localhost" ||
     hostname === "[::1]" ||
-    hostname === "::1" ||
-    hostname === "0.0.0.0"
+    hostname === "::1"
   ) {
     return true;
   }
