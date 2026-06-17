@@ -11,9 +11,6 @@
 
 import type { ResolvedDrizzleDbOptions } from "./options.js";
 
-/** Default drizzle-kit studio listen URL. */
-const DEFAULT_STUDIO_URL = "http://localhost:4983";
-
 /** Descriptor shape consumed by theokit's devtools overlay (G4). */
 export interface DrizzleDevtoolsTab {
   readonly id: "db-studio";
@@ -33,8 +30,10 @@ export interface DrizzleDevtoolsTab {
  * Returns a fresh descriptor each call so each consumer site gets an
  * independent mount() closure.
  */
-export function buildDevtoolsTab(_opts: ResolvedDrizzleDbOptions): DrizzleDevtoolsTab {
-  const studioUrl = DEFAULT_STUDIO_URL;
+export function buildDevtoolsTab(opts: ResolvedDrizzleDbOptions): DrizzleDevtoolsTab {
+  // #207: build the studio URL from the resolved host/port (default
+  // localhost:4983) instead of a hardcoded constant.
+  const studioUrl = `http://${opts.studioHost}:${opts.studioPort}`;
   return {
     id: "db-studio",
     label: "Database",
@@ -42,7 +41,10 @@ export function buildDevtoolsTab(_opts: ResolvedDrizzleDbOptions): DrizzleDevtoo
     mount(container: HTMLElement): void {
       const iframe = container.ownerDocument.createElement("iframe");
       iframe.src = studioUrl;
-      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
+      // #206: do NOT pair `allow-scripts` with `allow-same-origin` — that lets
+      // the framed studio remove its own sandbox and escape. Studio is a
+      // separate origin (its own host:port), so same-origin is unnecessary.
+      iframe.setAttribute("sandbox", "allow-scripts");
       iframe.style.border = "0";
       iframe.style.width = "100%";
       iframe.style.height = "100%";
