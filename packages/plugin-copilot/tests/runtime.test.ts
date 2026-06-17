@@ -679,4 +679,68 @@ describe("CopilotRuntime", () => {
     expect(prompt).toContain(MALICIOUS);
     expect(prompt).not.toContain(SYSTEM);
   });
+
+  it("test_idle_and_broadcast_do_not_double_spend (#F-tests-1)", async () => {
+    // F-tests-1 regression guard — BORN-GREEN: the reservation model
+    // (BudgetBridge.reserve → hold → reconcile/release, routed through the
+    // per-copilot serialization queue) already prevents double-spend. This test
+    // proves the invariant at the runtime level under the concurrent-trigger
+    // scenario the review named (idle + broadcast vs a tight budget). If it ever
+    // goes RED, it signals a regression in reserve() or the enqueue() queue.
+    vi.useFakeTimers();
+    try {
+      const provider = makeMemoryProvider();
+      const onResponse = vi.fn();
+      let resolveAgent!: () => void;
+      const agentGate = new Promise<void>((r) => {
+        resolveAgent = r;
+      });
+      const gatedAgent: CopilotAgentLike = {
+        async *streamObject<T>() {
+          await agentGate; // suspend Task-B until released, holding its reservation
+          yield { type: "complete" as const, object: { text: "ok" } as unknown as T };
+        },
+      };
+      const copilot = defineCopilot({
+        ...baseCopilot,
+        id: "spend",
+        triggers: [
+          { on: "broadcast:question", action: "respond" },
+          { on: "presence:idle", action: "suggest", idleMs: 1000 },
+        ],
+        budget: { perRoom: { dailyUsd: 0.01 } }, // exactly one invocation
+      });
+      const rt = new CopilotRuntime({
+        provider,
+        agent: gatedAgent,
+        copilots: [copilot],
+        onResponse,
+        estimatedCostPerInvocationUsd: 0.01,
+      });
+      await rt.activate("spend");
+      provider.emit("room-1", { type: "presence-changed", connectionId: "u1", presence: {} }); // arm idle
+
+      // Broadcast → Task-B enqueued, reserves (budget→0.01), suspends at the gate.
+      provider.emit("room-1", {
+        type: "broadcast",
+        connectionId: "user-1",
+        event: "question",
+        payload: { text: "hi" },
+      });
+      await Promise.resolve();
+
+      // Idle fires WHILE Task-B holds the reservation → Task-I queued behind it.
+      await vi.advanceTimersByTimeAsync(1001);
+      // Release Task-B → it reconciles (charge once); Task-I then reserves → exceeded.
+      resolveAgent();
+      await vi.advanceTimersByTimeAsync(50);
+
+      // No double-spend: exactly one invocation charged, the second rejected.
+      expect(rt.getUsage("spend")?.dailyUsedUsd).toBeCloseTo(0.01, 4);
+      expect(onResponse).toHaveBeenCalledOnce();
+      expect(provider.broadcasts.some((b) => b.event === "budget-exceeded")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
