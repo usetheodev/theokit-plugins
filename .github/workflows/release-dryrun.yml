@@ -122,6 +122,9 @@ jobs:
       # it is believed precisely because it ran.
       - name: Report the observable half of the release-blocking state
         env:
+          # zizmor: ignore[secrets-outside-env] -- this reads whether the secret EXISTS, never its value:
+          # the expression is a boolean comparison and the job holds read-only permissions. Restricting it
+          # to main would also defeat the workflow's purpose, which is rehearsing a release from any branch.
           HAS_APP_ID: ${{ secrets.RELEASE_APP_ID != '' }}
           HAS_APP_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
         run: |
