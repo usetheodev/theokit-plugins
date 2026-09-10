@@ -34,7 +34,7 @@
     "isomorphic-dompurify": "^3.16.0"
   },
   "peerDependencies": {
-    "@theokit/http": ">=1.1.1 <3",
+    "@theokit/http": ">=1.1.1 <3 || >=2.1.0-0 <2.2.0",
     "@theokit/ui": "^1.3.2",
     "@usetheo/ui": ">=0.22.0 <1",
     "mermaid": "^11.0.0",
